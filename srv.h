@@ -18,6 +18,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonValue>
+#include <QMovie>
 
 //********************************************************************************
 #define size_imei 15
@@ -187,6 +188,7 @@ private:
     Ui::MainWindow *ui;
     QTcpServer *tcpServer;    
     QMap <int, QTcpSocket *> SClients;
+    QMovie *movie;
 };
 
 #endif // SRV_H

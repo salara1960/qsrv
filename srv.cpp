@@ -19,7 +19,9 @@
 //char const *vers = "0.9";//23.11.2018
 //char const *vers = "0.9.1";//23.11.2018
 //char const *vers = "1.0";//24.11.2018
-char const *vers = "1.1";//26.11.2018
+//char const *vers = "1.1";//26.11.2018
+//char const *vers = "1.1.1";//26.11.2018
+char const *vers = "1.1.2";//26.11.2018
 
 
 const QString title = "GPS device (FM6320/FMB630) app.";
@@ -41,6 +43,8 @@ const QString srv_command_value = "value";
 const QString srv_command_time = "time";
 
 const QString mvolt = " mv";
+
+const QString car = ":/png/transport6.gif";
 
 //--------------------   Commands for device FMB630/FM6320   ---------------------------------------
 const char *cmds[] = {
@@ -92,7 +96,7 @@ const char *cmds[] = {
 "#GET REPANG",    //45//{"command":45,"param":X}, X=1..4 | Yes |//Get MinAngle from the configuration of a certain profile, X – profile
 "#GET SENDPERIOD",//46//{"command":46,"param":X}, X=1..4 | Yes |//Get SendPeriod from the configuration of a certain profile, X – profile
 "#GET REPMR",     //47//{"command":47,"param":X}, X=1..4 | Yes |//Get MinRecords from the configuration of a certain profile, X – profile
-"SET_ALL"         //48//{"command":48,"param":"X1,Y1 X2,Y2 X3,Y3 X4,Y4 X5,Y5 X6,Y6 X7,Y7 X8,Y8"} // set all relay to Xn,Yn / Xn=X,0,1 Yn=0...255
+"SET_ALL"         //48//{"command":48,"param":"X1,Y1 X2,Y2 X3,Y3 X4,Y4 X5,Y5 X6,Y6 X7,Y7 X8,Y8"}
 };
 
 const uint16_t crc16tab[] = // CRC lookup table [B]polynomial 0xA001[/B]
@@ -185,7 +189,7 @@ uint32_t tlen, crc = 0, dl = 0, cmd_len = 0;
 s_avl_cmd *hdr = NULL;
 char cds[max_cmd_len] = {0};
 
-    if ((!buf) || (command_id < 0) || (command_id >= max_cmds)) return ret;
+    if ((command_id < 0) || (command_id >= max_cmds)) return ret;
 
     sprintf(cds,"%s%s\r\n", &cmds[command_id][0], par);
 
@@ -246,7 +250,6 @@ char *MainWindow::ShowTime(time_t *ct, char *bf)
 //----------------------------------------------------------------------------------------------------------------------------
 char *MainWindow::io_name(uint8_t id, char *st)//for FMB630 or FM6320 only
 {
-    if (!st) return NULL;
 
     switch (id) {
         case 1  : sprintf(st,"DIN1"); break;
@@ -510,13 +513,6 @@ int arr_len = 0, ct = 0;
 
     if (obj) delete obj;
 
-    if ((ret == 1) || (ret == 2)) {//for relay #5, 6, 7, 8
-        if ((relay >= 5) && (relay <= 8)) {
-            relay -= 4;// convert relay number
-            ret += 32;//get command {"command":33} -"SET_ON", // set ON relay on extended module (4 relay #5,6,7,8)
-        }
-    }
-
     relay <<= 8;
 
     ret |= (val | relay);
@@ -581,7 +577,7 @@ uint16_t adc = mv;
 QJsonObject *MainWindow::ConvertStrToJsonObject(char *st, int *kda)
 {
 const int max_str = 256;
-int dl = 0, cmd, loop = 1, cnt = 0;
+int dl = 0, cmd = *kda, loop = 1, cnt = 0;
 char tp[max_str], val[max_str];
 uint8_t err = 0;
 QJsonObject *ret = NULL;
@@ -592,7 +588,6 @@ char *uki = NULL, *uks = NULL, *uke = NULL, *ukend = NULL;
         dl = strlen(st);
         if (!dl) return ret;
     }
-    cmd = *kda;
 
     if (dbg >= 2) {
         QString stx;
@@ -1104,9 +1099,14 @@ MainWindow::MainWindow(QWidget *parent, int p) : QMainWindow(parent), ui(new Ui:
     total_pack = total_cmd = 0;
     setWindowTitle(title + " ver. " + vers);
     ui->sending->setEnabled(false);
-    ui->avto->hide();
+    //ui->avto->hide();
     memset((uint8_t *)&pins, 0, sizeof(s_pins));
     tmr_sec = startTimer(1000);// 1 sec.
+
+    movie = new QMovie(car);
+    ui->avto->setMovie(movie);
+
+    //movie->start();
 }
 //-----------------------------------------------------------------------
 MainWindow::~MainWindow()
@@ -1114,12 +1114,20 @@ MainWindow::~MainWindow()
     killTimer(tmr_sec);
     if (tmr_ack) killTimer(tmr_ack);
     this->disconnect();
+    //movie->stop();
+    delete movie;
     delete ui;
 }
 //-----------------------------------------------------------------------
 void MainWindow::UpdatePins()
 {
-    if (pins.msensor) ui->avto->show(); else ui->avto->hide();
+    if (pins.msensor) {
+        ui->avto->setVisible(true);
+        movie->start();
+     } else {
+        ui->avto->setVisible(false);
+        movie->stop();
+    }
 
     if (pins.din1) ui->din1->setCheckState(Qt::Checked); else ui->din1->setCheckState(Qt::Unchecked);
     if (pins.din2) ui->din2->setCheckState(Qt::Checked); else ui->din2->setCheckState(Qt::Unchecked);
@@ -1138,7 +1146,10 @@ void MainWindow::UpdatePins()
 //-----------------------------------------------------------------------
 void MainWindow::ShowHideData(bool flg)
 {
-    if (!flg) ui->avto->hide();
+    if (!flg) {
+        ui->avto->setVisible(false);
+        movie->stop();
+    }
     ui->l_imei->setEnabled(flg); ui->imei->setEnabled(flg);
     ui->l_cmd->setEnabled(flg); ui->cmd->setEnabled(flg);
     ui->latitude->setEnabled(flg); ui->label->setEnabled(flg);
@@ -1194,6 +1205,9 @@ void MainWindow::on_starting_clicked()
     LogSave(__func__, stx, true);
     ui->sending->setEnabled(false);
     memset((uint8_t *)&pins, 0, sizeof(s_pins));
+
+    //ui->avto->setVisible(true);
+    //movie->start();
 }
 //-----------------------------------------------------------------------
 void MainWindow::on_stoping_clicked()
@@ -1214,6 +1228,9 @@ void MainWindow::on_stoping_clicked()
         dev_wait_answer = 0;
         ui->sending->setEnabled(false);
         ShowHideData(false);
+
+        movie->stop();
+        ui->avto->setVisible(false);
     }
 }
 //-----------------------------------------------------------------------
@@ -1343,6 +1360,7 @@ void MainWindow::slotCliDone(QTcpSocket *cli, int prn)
     client = auth = rdy = false;
     ui->sending->setEnabled(false);
     ShowHideData(auth);//false
+
 }
 //-----------------------------------------------------------------------
 void MainWindow::slotErrorClient(QAbstractSocket::SocketError SErr)

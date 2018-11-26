@@ -1,6 +1,6 @@
 <RCC>
-    <qresource>
+    <qresource prefix="/">
         <file>png/a2.png</file>
+        <file>png/transport6.gif</file>
     </qresource>
 </RCC>
-
