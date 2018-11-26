@@ -18,13 +18,14 @@
 //char const *vers = "0.8.3";//22.11.2018
 //char const *vers = "0.9";//23.11.2018
 //char const *vers = "0.9.1";//23.11.2018
-char const *vers = "1.0";//24.11.2018
+//char const *vers = "1.0";//24.11.2018
+char const *vers = "1.1";//26.11.2018
 
 
 const QString title = "GPS device (FM6320/FMB630) app.";
 const QString LogFileName = "logs.txt";
 uint8_t dbg = 2;
-const int time_wait_answer = 10000;
+const int time_wait_answer = 10000;//10 sec.
 
 char gradus = '^';
 const char *prio_name[] = {"Low","High","Panic","Security"};
@@ -726,7 +727,7 @@ QString qstx, qstz;
 
 
 
-    if (((uint32_t)dline < sizeof(s_hdr_pack_bin)) || (dline >= buf_size) || !js) {
+    if ((dline < (int)sizeof(s_hdr_pack_bin)) || (dline >= buf_size) || !js) {
         qstx.sprintf("Parse AVL error or ack for command -> len=%d\n", dline);
         LogSave(__func__, qstx, 1);
         return -1;
@@ -774,7 +775,7 @@ QString qstx, qstz;
     js->insert("TotalPackets", QJsonValue(h_bin->numbers_pack));
     jarr = new QJsonArray();
 
-/**/
+    /*---------------------------------------------------------------------------------------*/
     if ((codec_id == 12) || (codec_id == 13)) {//answer for command
         if (dbg >= 2) LogSave(NULL, "DATA:\n", 0);
         n_cnt = 0; i = 0;
@@ -825,7 +826,7 @@ QString qstx, qstz;
 
         return 0;
     }
-/**/
+    /*-----------------------------------------------------------------------------------------*/
 
     len = 0;
     _end = st + dline;
@@ -868,10 +869,10 @@ QString qstx, qstz;
             g_bin->sattelites = p_bin->sattelites;
             g_bin->speed = ntohs(p_bin->speed);
 
-            if (g_bin->latitude & 0x80000000) shi = 1;        // южная широта
+            if (g_bin->latitude & 0x80000000) shi = 1;     // южная широта
                                          else shi = 0;     // северная широта
-            if (g_bin->longitude & 0x80000000) dol = 1;        // западная долгота
-                                          else dol = 0;     // восточная долгота
+            if (g_bin->longitude & 0x80000000) dol = 1;    // западная долгота
+                                          else dol = 0;    // восточная долгота
             delitel = 10000000;
             lat = g_bin->latitude; lat /= delitel;    g_bin->latitude_grad = lat;//grad
             intm = (lat - g_bin->latitude_grad) * delitel; lat = intm; lat /= delitel; lat *= 60; g_bin->latitude_min = lat;//min
@@ -904,14 +905,12 @@ QString qstx, qstz;
                 qstx.clear(); qstx.append(stx);
                 LogSave(NULL, qstx, 0);
             }
-
             jpack->insert("Latitude",  QJsonValue(latit));
             jpack->insert("Longitude", QJsonValue(longit));
             jpack->insert("Altitude",  QJsonValue(g_bin->altitude));
             jpack->insert("Angle",     QJsonValue(g_bin->angle));
             jpack->insert("Sattelites",QJsonValue(g_bin->sattelites));
             jpack->insert("Speed",     QJsonValue(g_bin->speed));
-
             //-----------------------  show gps data  --------------------------------------------
             qstx.clear(); ui->latitude->setText(qstx.setNum(latit, 'f', 8));
             qstx.clear(); ui->longitude->setText(qstx.setNum(longit, 'f', 8));
@@ -1104,10 +1103,10 @@ MainWindow::MainWindow(QWidget *parent, int p) : QMainWindow(parent), ui(new Ui:
     dev_wait_answer = 0;
     total_pack = total_cmd = 0;
     setWindowTitle(title + " ver. " + vers);
-    ui->sending->setEnabled(false);//block send button
+    ui->sending->setEnabled(false);
     ui->avto->hide();
     memset((uint8_t *)&pins, 0, sizeof(s_pins));
-    tmr_sec = startTimer(1000);
+    tmr_sec = startTimer(1000);// 1 sec.
 }
 //-----------------------------------------------------------------------
 MainWindow::~MainWindow()
@@ -1179,8 +1178,7 @@ void MainWindow::on_starting_clicked()
         throw TheError(MyError);
     }
 
-    QString sp; sp.sprintf("%d", port);
-    QString stx = "Server start, listen port " + sp;
+    QString stx = "Server start, listen port " + QString::number(port, 10);
 
     connect(tcpServer, SIGNAL(newConnection()), this, SLOT(newuser()));
 
@@ -1194,7 +1192,7 @@ void MainWindow::on_starting_clicked()
     statusBar()->clearMessage();
     statusBar()->showMessage(stx);
     LogSave(__func__, stx, true);
-    ui->sending->setEnabled(false);//block send button
+    ui->sending->setEnabled(false);
     memset((uint8_t *)&pins, 0, sizeof(s_pins));
 }
 //-----------------------------------------------------------------------
@@ -1214,7 +1212,7 @@ void MainWindow::on_stoping_clicked()
         client = auth = rdy = false;
         fd = -1;
         dev_wait_answer = 0;
-        ui->sending->setEnabled(false);//block send button
+        ui->sending->setEnabled(false);
         ShowHideData(false);
     }
 }
@@ -1244,7 +1242,6 @@ void MainWindow::newuser()
             statusBar()->clearMessage(); statusBar()->showMessage(stx);
             ui->sending->setEnabled(true);//unblock send button
             memset((uint8_t *)&pins, 0, sizeof(s_pins));
-            //ShowHideData(false);
         } else {
             stx.append("New client '" + CliUrl + "' online, socket " + ssock + ", but client already present !\n");
             cliSocket->close();
@@ -1314,6 +1311,7 @@ QString stx;
                           " bytes, packets/commands=" + QString::number(total_pack, 10) + "/" + QString::number(total_cmd, 10);
             LogSave(__func__, stx, true);
             statusBar()->clearMessage(); statusBar()->showMessage(stx);
+
             //send ack : cnt_pack
             memset(to_cli, 0, 4); to_cli[3] = cnt_pack; cliSocket->write(to_cli, 4);
 
@@ -1343,7 +1341,7 @@ void MainWindow::slotCliDone(QTcpSocket *cli, int prn)
     }
     SClients.remove(fd); fd = -1;
     client = auth = rdy = false;
-    ui->sending->setEnabled(false);//block send button
+    ui->sending->setEnabled(false);
     ShowHideData(auth);//false
 }
 //-----------------------------------------------------------------------
