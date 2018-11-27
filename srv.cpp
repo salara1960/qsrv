@@ -1,9 +1,6 @@
 #include "srv.h"
 #include "ui_srv.h"
-
-
 //-----------------------------------------------------------------------
-
 //char const *vers = "0.2";//15.11.2018
 //char const *vers = "0.3";//17.11.2018
 //char const *vers = "0.4";//18.11.2018
@@ -21,7 +18,9 @@
 //char const *vers = "1.0";//24.11.2018
 //char const *vers = "1.1";//26.11.2018
 //char const *vers = "1.1.1";//26.11.2018
-char const *vers = "1.1.2";//26.11.2018
+//char const *vers = "1.1.2";//26.11.2018
+//char const *vers = "1.1.3";//26.11.2018
+char const *vers = "1.2";//27.11.2018
 
 
 const QString title = "GPS device (FM6320/FMB630) app.";
@@ -45,6 +44,8 @@ const QString srv_command_time = "time";
 const QString mvolt = " mv";
 
 const QString car = ":/png/transport6.gif";
+
+const char *form = "DOUTS are set to: ";
 
 //--------------------   Commands for device FMB630/FM6320   ---------------------------------------
 const char *cmds[] = {
@@ -579,9 +580,10 @@ QJsonObject *MainWindow::ConvertStrToJsonObject(char *st, int *kda)
 const int max_str = 256;
 int dl = 0, cmd = *kda, loop = 1, cnt = 0;
 char tp[max_str], val[max_str];
-uint8_t err = 0;
+uint8_t err = 0, up = 0;
 QJsonObject *ret = NULL;
 char *uki = NULL, *uks = NULL, *uke = NULL, *ukend = NULL;
+
 
     if (!st) return ret;
     else {
@@ -660,6 +662,18 @@ char *uki = NULL, *uks = NULL, *uke = NULL, *ukend = NULL;
                 }
             }
         break;
+        case 1://"DOUTS are set to: 1000 TMOs are: 0 0 0 0"
+        case 2:
+            uks = strstr(st, form);
+            if (uks) {
+                uks += strlen(form);
+                char cha = *uks++; if ((cha == '1') || (cha == '0')) pins.dout1 = (cha - 0x30);
+                cha = *uks++;      if ((cha == '1') || (cha == '0')) pins.dout2 = cha - 0x30;
+                cha = *uks++;      if ((cha == '1') || (cha == '0')) pins.dout3 = cha - 0x30;
+                cha = *uks;        if ((cha == '1') || (cha == '0')) pins.dout4 = cha - 0x30;
+                up = 1;
+            }
+        break;
     }//switch (cmd)
 
     if ((err) && (ret)) {
@@ -667,24 +681,28 @@ char *uki = NULL, *uks = NULL, *uke = NULL, *ukend = NULL;
         ret = NULL;
     }
 
-    if (!err && ret && (cmd == 15)) {
-        QJsonValue tmp;
-        tmp = ret->value("DI1"); if (!tmp.isUndefined()) pins.din1 = tmp.toString().toInt();
-        tmp = ret->value("DI2"); if (!tmp.isUndefined()) pins.din2 = tmp.toString().toInt();
-        tmp = ret->value("DI3"); if (!tmp.isUndefined()) pins.din3 = tmp.toString().toInt();
-        tmp = ret->value("DI4"); if (!tmp.isUndefined()) pins.din4 = tmp.toString().toInt();
+    if (!err && ret) {
+        if (cmd == 15)  {
+            QJsonValue tmp;
+            tmp = ret->value("DI1"); if (!tmp.isUndefined()) pins.din1 = tmp.toString().toInt();
+            tmp = ret->value("DI2"); if (!tmp.isUndefined()) pins.din2 = tmp.toString().toInt();
+            tmp = ret->value("DI3"); if (!tmp.isUndefined()) pins.din3 = tmp.toString().toInt();
+            tmp = ret->value("DI4"); if (!tmp.isUndefined()) pins.din4 = tmp.toString().toInt();
 
-        tmp = ret->value("DO1"); if (!tmp.isUndefined()) pins.dout1 = tmp.toString().toInt();
-        tmp = ret->value("DO2"); if (!tmp.isUndefined()) pins.dout2 = tmp.toString().toInt();
-        tmp = ret->value("DO3"); if (!tmp.isUndefined()) pins.dout3 = tmp.toString().toInt();
-        tmp = ret->value("DO4"); if (!tmp.isUndefined()) pins.dout4 = tmp.toString().toInt();
+            tmp = ret->value("DO1"); if (!tmp.isUndefined()) pins.dout1 = tmp.toString().toInt();
+            tmp = ret->value("DO2"); if (!tmp.isUndefined()) pins.dout2 = tmp.toString().toInt();
+            tmp = ret->value("DO3"); if (!tmp.isUndefined()) pins.dout3 = tmp.toString().toInt();
+            tmp = ret->value("DO4"); if (!tmp.isUndefined()) pins.dout4 = tmp.toString().toInt();
 
-        tmp = ret->value("AIN1"); if (!tmp.isUndefined()) pins.ain1 = tmp.toString().toInt();
-        tmp = ret->value("AIN2"); if (!tmp.isUndefined()) pins.ain2 = tmp.toString().toInt();
-        tmp = ret->value("AIN3"); if (!tmp.isUndefined()) pins.ain3 = tmp.toString().toInt();
-
-        UpdatePins();
+            tmp = ret->value("AIN1"); if (!tmp.isUndefined()) pins.ain1 = tmp.toString().toInt();
+            tmp = ret->value("AIN2"); if (!tmp.isUndefined()) pins.ain2 = tmp.toString().toInt();
+            tmp = ret->value("AIN3"); if (!tmp.isUndefined()) pins.ain3 = tmp.toString().toInt();
+            up = 1;
+        }
     }
+
+    if (up) UpdatePins();
+
 
     return ret;
 }
@@ -1099,14 +1117,11 @@ MainWindow::MainWindow(QWidget *parent, int p) : QMainWindow(parent), ui(new Ui:
     total_pack = total_cmd = 0;
     setWindowTitle(title + " ver. " + vers);
     ui->sending->setEnabled(false);
-    //ui->avto->hide();
     memset((uint8_t *)&pins, 0, sizeof(s_pins));
     tmr_sec = startTimer(1000);// 1 sec.
 
     movie = new QMovie(car);
     ui->avto->setMovie(movie);
-
-    //movie->start();
 }
 //-----------------------------------------------------------------------
 MainWindow::~MainWindow()
@@ -1114,7 +1129,6 @@ MainWindow::~MainWindow()
     killTimer(tmr_sec);
     if (tmr_ack) killTimer(tmr_ack);
     this->disconnect();
-    //movie->stop();
     delete movie;
     delete ui;
 }
@@ -1206,8 +1220,6 @@ void MainWindow::on_starting_clicked()
     ui->sending->setEnabled(false);
     memset((uint8_t *)&pins, 0, sizeof(s_pins));
 
-    //ui->avto->setVisible(true);
-    //movie->start();
 }
 //-----------------------------------------------------------------------
 void MainWindow::on_stoping_clicked()
@@ -1257,7 +1269,7 @@ void MainWindow::newuser()
             connect(SClients[fd], SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(slotErrorClient(QAbstractSocket::SocketError)));
             connect(this, SIGNAL(sigRdyPack(int)), this, SLOT(slotRdyPack(int)));
             statusBar()->clearMessage(); statusBar()->showMessage(stx);
-            ui->sending->setEnabled(true);//unblock send button
+            ui->sending->setEnabled(true);
             memset((uint8_t *)&pins, 0, sizeof(s_pins));
         } else {
             stx.append("New client '" + CliUrl + "' online, socket " + ssock + ", but client already present !\n");
@@ -1329,11 +1341,10 @@ QString stx;
             LogSave(__func__, stx, true);
             statusBar()->clearMessage(); statusBar()->showMessage(stx);
 
-            //send ack : cnt_pack
+            //--------------------- send ack : cnt_pack ----------------------------
             memset(to_cli, 0, 4); to_cli[3] = cnt_pack; cliSocket->write(to_cli, 4);
 
             emit sigRdyPack(lenrecv);
-
         }
     }
 
@@ -1471,44 +1482,44 @@ char st[4] = {0};
                         sprintf(cmd_par+strlen(cmd_par)," 0 0 0 0");
                     }
                 break;
-                case 3://{"command":3} - 'разблокировать бензонасос' -> "SET_ON 1 0"  //{"command":33, "relay":1,"time":0}
+                case 3:
                     if (cmd_id == 3) cid = 33;//"SET_ON 1 0"
                                 else cid = 34;//"SET_OFF 1 0"
                     sprintf(cmd_par, " 1 0");
                 break;
-                case 4://{"command":4} - 'заблокировать бензонасоса' -> "SET_OFF 1 0"  //{"command":34, "relay":1,"time":0}
+                case 4:
                     if (cmd_id == 3) cid = 33;//"SET_ON 1 0"
                                 else cid = 34;//"SET_OFF 1 0"
                     sprintf(cmd_par, " 1 0");
                 break;
-                case 5://{"command":5} - 'разблокировать двери' -> "SET_ON 2 2" //{"command":33,"relay":2, "time":2}
+                case 5:
                     cid = 33;
                     sprintf(cmd_par, " 2 2");//"SET_ON 2 2"
                 break;
-                case 6://{"command":6} - 'заблокировать двери' (18 сек) -> "SET_ON 3 18" //{"command":33,"relay":3, "time":18}
-                case 7://{"command":7} - 'заблокировать двери' (2 сек) -> "SET_ON 3 2" //{"command":33,"relay":3, "time":2}
+                case 6:
+                case 7:
                     cid = 33;
                     if (cmd_id == 6) sprintf(cmd_par, " 3 18");//"SET_ON 3 18"
                                 else sprintf(cmd_par, " 3 2");//"SET_ON 3 2"
                 break;
-                case 8://{"command":8} - 'включить аврийку' -> "SET_ON 4 0" //{"command":33,"relay":4,"time":0}
-                case 10://{"command":10} - 'выключить аварийку' -> "SET_OFF 4 0" //{"command":34,"relay":4,"time":0}
+                case 8:
+                case 10:
                     if (cmd_id == 8) cid = 33;//"SET_ON 4 0"
                                 else cid = 34;//"SET_OFF 4 0"
                     sprintf(cmd_par, " 4 0");
                 break;
-                case 9://{"command":9} - 'включить аврийку' -> "SET_ON 4 Y" //{"command":33,"relay":4,"time":Y}
+                case 9:
                     cid = 33;
                     sprintf(cmd_par, " 4 %d", 5);//oc_time);//"SET_ON 4 Y"
                 break;
-                case 11://{"command":11} - 'включить зажигание' -> "SET_ON 5 0" //{"command":33,"relay":5,"time":0}
-                case 12://{"command":12} - 'выключить зажигание' -> "SET_OFF 5 0" //{"command":34,"relay":5,"time":0}
+                case 11:
+                case 12:
                     if (cmd_id == 11)  cid = 33;//"SET_ON 5 0"
                                   else cid = 34;//"SET_OFF 5 0"
                     sprintf(cmd_par, " 5 0");
                 break;
-                case 13://{"command":13} - 'запустить стартер' -> "SET_ON 6 2" //{"command":33,"relay":6,"time":2}
-                case 14://{"command":14} - 'включить звуковой сигнал на 1 сек.' "SET_ON 7 2" //{"command":33,"relay":7,"time":2}
+                case 13:
+                case 14:
                     cid = 33;
                     if (cmd_id == 13) sprintf(cmd_par, " 6 2");//"SET_ON 6 2"
                                  else sprintf(cmd_par, " 7 2");//"SET_ON 7 2"

@@ -2,12 +2,14 @@
 
 int main(int argc, char *argv[])
 {
-const int port = 9090;
+int port = 9090;
 int cerr = 0;
 QString errStr = "";
 QString cerrStr;
 
     setlocale(LC_ALL,"UTF8");
+
+    if (argc > 1) port = atoi(argv[1]);
 
     try {
         QApplication srv(argc, argv);

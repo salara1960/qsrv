@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <time.h>
 #include <endian.h>
+#include <stdlib.h>
 #include <QApplication>
 #include <QMainWindow>
 #include <QtNetwork>
