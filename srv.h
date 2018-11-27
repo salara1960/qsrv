@@ -7,6 +7,7 @@
 #include <time.h>
 #include <endian.h>
 #include <stdlib.h>
+#include <string.h>
 #include <QApplication>
 #include <QMainWindow>
 #include <QtNetwork>
@@ -20,6 +21,12 @@
 #include <QJsonArray>
 #include <QJsonValue>
 #include <QMovie>
+#include <QMessageBox>
+#include <QtSql>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QSqlError>
+
 
 //********************************************************************************
 #define size_imei 15
@@ -31,6 +38,8 @@
 #define max_cmd_len 128
 #define max_cmds 49
 #define max_rel 8
+#define max_dev_type 4
+#define max_rows 4
 //********************************************************************************
 
 #pragma pack(push,1)
@@ -114,6 +123,16 @@ typedef struct
 } s_pins;
 #pragma pack(pop)
 
+#pragma pack(push,1)
+typedef struct
+{
+    int index;
+    QString imei;
+    QString sim;
+    uint8_t type;
+} s_car;
+#pragma pack(pop)
+
 //********************************************************************************
 //********************************************************************************
 //********************************************************************************
@@ -138,7 +157,7 @@ public:
             TheError(int);
     };
 
-    explicit MainWindow(QWidget *parent = 0, int p = 9090);
+    explicit MainWindow(QWidget *parent = 0, int p = 9090, QString *dnm = 0);
     ~MainWindow();
     void timerEvent(QTimerEvent *event);
 
@@ -169,6 +188,9 @@ private slots:
     void slotRdyPack(int);
     void slotWaitDone();
 
+    bool check_dev(s_car *car);
+    void sql_err_msg(QSqlError &er);
+
 signals:
 
     void sigCliDone(QTcpSocket *, int);
@@ -190,6 +212,14 @@ private:
     QTcpServer *tcpServer;    
     QMap <int, QTcpSocket *> SClients;
     QMovie *movie;
+    //
+    QSqlDatabase *db;
+    QSqlQuery *query;
+    QString *db_name;
+    bool openok, good;
+    QSqlError sql_err;
+    s_car thecar;
+    //
 };
 
 #endif // SRV_H

@@ -6,6 +6,7 @@ int port = 9090;
 int cerr = 0;
 QString errStr = "";
 QString cerrStr;
+QString dnm("cars.s3db");
 
     setlocale(LC_ALL,"UTF8");
 
@@ -13,7 +14,7 @@ QString cerrStr;
 
     try {
         QApplication srv(argc, argv);
-        MainWindow wnd(NULL, port);
+        MainWindow wnd(NULL, port, &dnm);
         wnd.show();
         srv.exec();
     }

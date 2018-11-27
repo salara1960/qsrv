@@ -20,10 +20,12 @@
 //char const *vers = "1.1.1";//26.11.2018
 //char const *vers = "1.1.2";//26.11.2018
 //char const *vers = "1.1.3";//26.11.2018
-char const *vers = "1.2";//27.11.2018
+//char const *vers = "1.2";//27.11.2018
+//char const *vers = "1.2.1";//27.11.2018
+char const *vers = "1.3";//27.11.2018
 
 
-const QString title = "GPS device (FM6320/FMB630) app.";
+const QString title = "GPS device (Teltonika) app.";
 const QString LogFileName = "logs.txt";
 uint8_t dbg = 2;
 const int time_wait_answer = 10000;//10 sec.
@@ -46,6 +48,14 @@ const QString mvolt = " mv";
 const QString car = ":/png/transport6.gif";
 
 const char *form = "DOUTS are set to: ";
+
+QString dev_type_name[] = {"FM1110", "FM5300", "FMB630", "FM6320"};
+
+const char *mk_table = "CREATE TABLE IF NOT EXISTS cars (\
+        index INTEGER primary key autoincrement, \
+        imei TEXT, \
+        sim TEXT, \
+        type INTEGER);";
 
 //--------------------   Commands for device FMB630/FM6320   ---------------------------------------
 const char *cmds[] = {
@@ -745,7 +755,7 @@ QString qstx, qstz;
         LogSave(__func__, qstx, 1);
         return -1;
     } else {
-        qstx.sprintf("Parse AVL with len=%d from dev_type FMB630/FM6320\n", dline);
+        qstx.sprintf("Parse AVL with len=%d from dev_type %d (", thecar.type, dline); qstx.append(dev_type_name[thecar.type] + ")\n");
         LogSave(__func__, qstx, 1);
     }
 
@@ -1102,9 +1112,11 @@ QString qstx, qstz;
 MainWindow::TheError::TheError(int err) { code = err; }
 
 //----------------------------------------------------------------------------------------------------------------------------
-MainWindow::MainWindow(QWidget *parent, int p) : QMainWindow(parent), ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    //this->setFixedSize(this->size());
+
     port = p;
     tcpServer = NULL;
     MyError = 0;
@@ -1122,15 +1134,98 @@ MainWindow::MainWindow(QWidget *parent, int p) : QMainWindow(parent), ui(new Ui:
 
     movie = new QMovie(car);
     ui->avto->setMovie(movie);
+
+    s_car thecar = {0,"","",0};
+    db_name = dnm;
+    query = NULL;
+    sql_err.setType(QSqlError::NoError);
+    openok = good = false;
+    db = new QSqlDatabase(QSqlDatabase::addDatabase("QSQLITE"));
+    db->setDatabaseName(*db_name);
+    openok = db->open();
+    query = new QSqlQuery(*db);
+
 }
 //-----------------------------------------------------------------------
 MainWindow::~MainWindow()
 {
+    if (query) {
+        query->clear();
+        delete query;
+    }
+    if (db) {
+        if (db->isOpen()) db->close();
+        delete db;
+    }
     killTimer(tmr_sec);
     if (tmr_ack) killTimer(tmr_ack);
     this->disconnect();
     delete movie;
     delete ui;
+}
+//--------------------------------------------------------------------------
+void MainWindow::sql_err_msg(QSqlError &er)
+{
+    if (er.type() == QSqlError::NoError) return;
+    QMessageBox::critical(this,"Ошибка", "База данных " + *db_name + ": " + er.text());
+}
+//--------------------------------------------------------------------------
+bool MainWindow::check_dev(s_car *car)
+{
+bool ret = false;
+
+    if (query) {
+        query->clear();
+        query->exec(mk_table);
+    }
+
+    if (openok) {// DB открыта, с ней можно работать
+        //ui->textinfo->append("DB open OK");
+        sql_err.setType(QSqlError::NoError);
+        if (query->exec("SELECT * FROM `cars` order by `index`;")) {
+            //ui->textinfo->append("query->exec(SELECT) - OK");
+            s_car tmp = {0,"","",0};
+            int ix = 0; bool ok;
+            while (query->next()) {
+                ix++;
+                tmp.index = query->value(0).toString().toInt(&ok, 10);
+                tmp.imei = query->value(1).toString();
+                tmp.sim = query->value(2).toString();
+                tmp.type = query->value(3).toString().toInt(&ok, 10);
+                QString stx = QString::number(ix, 10) + " : " +
+                        QString::number(tmp.index, 10) + " | " +
+                        tmp.imei + " | " +
+                        tmp.sim + " | " +
+                        QString::number(tmp.type);
+                //ui->textinfo->append(stx);
+                LogSave(__func__, stx, true);
+                if (imei.length()) {
+                    if (imei == tmp.imei) {
+                        car->index = tmp.index;
+                        car->imei = tmp.imei;
+                        car->sim = tmp.sim;
+                        car->type = tmp.type;
+                        statusBar()->clearMessage(); statusBar()->showMessage(stx);
+                        ret = true;
+                        break;
+                    }
+                }
+            }
+        } else {
+            sql_err = query->lastError();
+            ui->textinfo->append("query->exec(SELECT) - Error");
+        }
+    } else ui->textinfo->append("error open DB");
+
+
+    if (openok) {
+        if (sql_err.type() != (QSqlError::NoError)) {
+            ret = openok = false;
+            sql_err_msg(sql_err);
+        }
+    }
+
+    return ret;
 }
 //-----------------------------------------------------------------------
 void MainWindow::UpdatePins()
@@ -1220,6 +1315,8 @@ void MainWindow::on_starting_clicked()
     ui->sending->setEnabled(false);
     memset((uint8_t *)&pins, 0, sizeof(s_pins));
 
+    //check_dev(&thecar);
+
 }
 //-----------------------------------------------------------------------
 void MainWindow::on_stoping_clicked()
@@ -1271,6 +1368,10 @@ void MainWindow::newuser()
             statusBar()->clearMessage(); statusBar()->showMessage(stx);
             ui->sending->setEnabled(true);
             memset((uint8_t *)&pins, 0, sizeof(s_pins));
+            thecar.index = 0;
+            thecar.imei = "";
+            thecar.sim = "";
+            thecar.type = 0;
         } else {
             stx.append("New client '" + CliUrl + "' online, socket " + ssock + ", but client already present !\n");
             cliSocket->close();
@@ -1283,7 +1384,7 @@ void MainWindow::newuser()
 void MainWindow::slotReadClient()
 {
 QTcpSocket *cliSocket = (QTcpSocket *)sender();
-QString out;
+//QString out;
 qint64 dl = 0;
 QString stx;
 
@@ -1295,12 +1396,29 @@ QString stx;
                 if (lenrecv == sizeof(s_imei)) {
                     s_imei *im = (s_imei *)from_cli;
                     imei.clear(); imei.append(im->imei);
-                    ui->imei->setText(imei);
-                    to_cli[0] = 0x01; cliSocket->write(to_cli, 1);
-                    auth = true;
-                    lenrecv = 0; memset(from_cli, 0, sizeof(from_cli)); rxdata = sizeof(s_avl_hdr);
-                    faza = 1;
-                    ShowHideData(auth);//true
+                    if (check_dev(&thecar)) {
+                        ui->imei->setText(imei);
+                        to_cli[0] = 0x01; cliSocket->write(to_cli, 1);
+                        auth = true;
+                        lenrecv = 0; memset(from_cli, 0, sizeof(from_cli)); rxdata = sizeof(s_avl_hdr);
+                        faza = 1;
+                        ShowHideData(auth);//true
+                        stx = "Client DevID : " +
+                              QString::number(thecar.index, 10) + " | " +
+                              thecar.imei + " | " +
+                              thecar.sim  + " | " +
+                              dev_type_name[thecar.type] + " (" + QString::number(thecar.type) + ")";
+                        ui->textinfo->append(stx);
+                        statusBar()->clearMessage(); statusBar()->showMessage(stx);
+                        LogSave(__func__, stx, true);
+                    } else {
+                        stx = "ClientDevID " + imei + " unknown.";
+                        ui->textinfo->append(stx);
+                        statusBar()->clearMessage(); statusBar()->showMessage(stx);
+                        LogSave(__func__, stx, true);
+                        slotCliDone(cliSocket, 1);
+                        return;
+                    }
                 }
             }
         break;
@@ -1394,7 +1512,7 @@ void MainWindow::slotRdyPack(int ilen)
         QJsonObject *jobj = new QJsonObject();//json_object();
         if (jobj) {
             bool yes = true;
-            jobj->insert("DevName", QJsonValue("FMB630"));
+            jobj->insert("DevName", QJsonValue(dev_type_name[thecar.type]));
             jobj->insert("DevID",   QJsonValue(imei));
             jobj->insert("ServerTime",QJsonValue((qint32)time(NULL)));
             jobj->insert("FromAddr", QJsonValue(CliUrl));
