@@ -27,7 +27,6 @@
 #include <QSqlQuery>
 #include <QSqlError>
 
-
 //********************************************************************************
 #define size_imei 15
 #define size_num 16
@@ -44,7 +43,6 @@
 #define def_oc_time 2
 //********************************************************************************
 
-//QString dev_type_name[] = {"FM1110", "FM5300", "FMB630", "FM6320", "Unknown"};
 typedef enum {
     DEV_FM1110 = 0,
     DEV_FM5300,
@@ -66,7 +64,7 @@ typedef struct
 } s_avl_hdr;
 #pragma pack(pop)
 
-//----------------  AVL  packet with codec.id = 12 (command to device)  ------------------
+//----------------  AVL packet with codec.id = 12 (command to device)  ------------------
 #pragma pack(push,1)
 typedef struct
 {
@@ -230,14 +228,12 @@ private:
     QTcpServer *tcpServer;    
     QMap <int, QTcpSocket *> SClients;
     QMovie *movie;
-    //
     QSqlDatabase *db;
     QSqlQuery *query;
     QString *db_name;
     bool openok, good;
     QSqlError sql_err;
     s_car thecar;
-    //
 };
 
 #endif // SRV_H

@@ -2,10 +2,8 @@
 
 int main(int argc, char *argv[])
 {
-int port = 9090;
-int cerr = 0;
-QString errStr = "";
-QString cerrStr;
+int port = 9090, cerr = 0;
+QString errStr = "", cerrStr;
 QString dnm("cars.s3db");
 
     setlocale(LC_ALL,"UTF8");

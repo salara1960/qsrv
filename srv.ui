@@ -1181,7 +1181,7 @@ background-color:rgb(226, 226, 226)}</string>
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">image: url(:/png/ignition1.png);</string>
+         <string notr="true">image: url(:/png/ignition111.png);</string>
         </property>
         <property name="text">
          <string/>

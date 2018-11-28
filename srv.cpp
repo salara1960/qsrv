@@ -1,5 +1,6 @@
 #include "srv.h"
 #include "ui_srv.h"
+
 //-----------------------------------------------------------------------
 //char const *vers = "0.2";//15.11.2018
 //char const *vers = "0.3";//17.11.2018
@@ -26,7 +27,8 @@
 //char const *vers = "1.3.1";//27.11.2018
 //char const *vers = "1.4";//27.11.2018
 //char const *vers = "1.5";//28.11.2018
-char const *vers = "1.5.1";//28.11.2018
+//char const *vers = "1.5.1";//28.11.2018
+char const *vers = "1.5.2";//28.11.2018
 
 
 const QString title = "GPS device (Teltonika) server application";
@@ -246,14 +248,13 @@ const char *cmu = NULL;
     if (thecar.type == DEV_FM1110) {
         max_cm = max_cmds0;
         cmu = &cmds0[command_id][0];
-    } else {//DEV_FMB630, DEV_FM5300
+    } else {//DEV_FM5300, DEV_FMB630, DEV_FM6320
         max_cm = max_cmds1;
         cmu = &cmds1[command_id][0];
     }
 
     if ((command_id < 0) || (command_id >= max_cm)) return ret;
 
-    //sprintf(cds, "%s%s\r\n", &cmds[command_id][0], par);
     if (thecar.type > DEV_FM1110) {
         if (command_id == 27) {//"lvcansetprog", //"setcanprog"  //27//LVCANSETPROG     //"lvcansetprog 112" | Yes//{"command":27}
             if (thecar.type == DEV_FM5300) sprintf(cds, "setcanprog%s", par);//FM5300
@@ -277,7 +278,7 @@ const char *cmu = NULL;
     tmp = (uint8_t *)calloc(1, alen + 1);
     if (tmp) {
         hdr = (s_avl_cmd *)tmp;
-        hdr->codec_id = 0x0c;//CodecID=12
+        hdr->codec_id = 0x0c;
         hdr->cmd_cnt = cnt;
         uk = tmp + sizeof(s_avl_cmd);//uk to command_type
         ct = 0;
@@ -739,7 +740,6 @@ int MainWindow::CalcFuel(uint16_t mv, uint8_t ign)
 int ret = -1;
 uint16_t adc = mv;
 
-
     if (ign) {
              if (adc <= 750) ret = 42;
         else if (adc <= 825) ret = 41;
@@ -880,7 +880,7 @@ char *uki = NULL, *uks = NULL, *uke = NULL, *ukend = NULL;
             uks = strstr(st, form);
             if (uks) {
                 uks += strlen(form);
-                char cha = *uks++; if ((cha == '1') || (cha == '0')) pins.dout1 = (cha - 0x30);
+                char cha = *uks++; if ((cha == '1') || (cha == '0')) pins.dout1 = cha - 0x30;
                 cha = *uks++;      if ((cha == '1') || (cha == '0')) pins.dout2 = cha - 0x30;
                 cha = *uks++;      if ((cha == '1') || (cha == '0')) pins.dout3 = cha - 0x30;
                 cha = *uks;        if ((cha == '1') || (cha == '0')) pins.dout4 = cha - 0x30;
@@ -1454,8 +1454,9 @@ void MainWindow::UpdatePins()
 //-----------------------------------------------------------------------
 void MainWindow::ShowHideData(bool flg)
 {
-    ui->l_ignition->setVisible((bool)pins.din1);
-    if (!flg) {
+    if (flg) ui->l_ignition->setVisible((bool)pins.din1);
+    else {
+        ui->l_ignition->setVisible(flg);
         ui->avto->setVisible(false);
         movie->stop();
     }
