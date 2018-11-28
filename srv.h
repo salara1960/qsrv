@@ -36,11 +36,21 @@
 #define buf_size 8192
 #define total_prio 4
 #define max_cmd_len 128
-#define max_cmds 49
+#define max_cmds0 23// for FM1110
+#define max_cmds1 49//48//42//39//38//44//35//33//32//30//28//23 for FM5300, FM6320, FMB630
 #define max_rel 8
 #define max_dev_type 4
 #define max_rows 4
+#define def_oc_time 2
 //********************************************************************************
+
+//QString dev_type_name[] = {"FM1110", "FM5300", "FMB630", "FM6320"};
+typedef enum {
+    DEV_FM1110 = 0,
+    DEV_FM5300,
+    DEV_FMB630,
+    DEV_FM6320
+} dev_type_t;
 
 #pragma pack(push,1)
 typedef struct
@@ -167,7 +177,7 @@ public slots:
     uint16_t ks(uint8_t *, int);
     int MakeAvlPacket(void *, int, char *);
     char *ShowTime(time_t *, char *);
-    char *io_name(uint8_t, char *);
+    char *io_name(uint8_t, char *, uint8_t);
     int ParseResp(QString *, char *);
     int CalcFuel(uint16_t, uint8_t);
     QJsonObject *ConvertStrToJsonObject(char *, int *);

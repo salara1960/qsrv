@@ -22,7 +22,9 @@
 //char const *vers = "1.1.3";//26.11.2018
 //char const *vers = "1.2";//27.11.2018
 //char const *vers = "1.2.1";//27.11.2018
-char const *vers = "1.3";//27.11.2018
+//char const *vers = "1.3";//27.11.2018
+//char const *vers = "1.3.1";//27.11.2018
+char const *vers = "1.4";//27.11.2018
 
 
 const QString title = "GPS device (Teltonika) app.";
@@ -52,13 +54,38 @@ const char *form = "DOUTS are set to: ";
 QString dev_type_name[] = {"FM1110", "FM5300", "FMB630", "FM6320"};
 
 const char *mk_table = "CREATE TABLE IF NOT EXISTS cars (\
-        index INTEGER primary key autoincrement, \
-        imei TEXT, \
-        sim TEXT, \
-        type INTEGER);";
-
+                        index INTEGER primary key autoincrement, \
+                        imei TEXT, \
+                        sim TEXT, \
+                        type INTEGER);";
+//--------------------   Commands for device FM1110   ---------------------------------------
+const char *cmds0[] = {//23 commands
+"setdigout 0X 0 0",     //0//set DOUT1=0 | Yes
+"setdigout 1X",         //1//set DOUT1=1 | Yes | open door
+"setdigout X0 0 0",     //2//set DOUT2=0 -> Ignition disable | Yes
+"setdigout X1",         //3//set DOUT2=1 -> Ignition enable | Yes | close door
+"setdigout 00 0 0",     //4//set DOUT1=0 & DOUT2=0 -> all disable | Yes
+"setdigout 11",         //5//set DOUT1=1 & DOUT2=1 -> all enable | Yes
+"getstatus",            //6//Modem Status information | Yes
+"getweektime",          //7//Current device time, Day of Week and amount of minutes passed since start of week | Yes
+"getops",               //8//List of currently available GSM operator | Yes
+"getcfgtime",           //9//Date and Time of last successful configuration | Yes
+"getgps",               //10//Current GPS data and time | Yes
+"getver",               //11//Device / Modem / Code version information | Yes
+"getinfo",              //12//Device runtime system information | Yes
+"getio",                //13//Readout digital inputs and outputs | Yes
+"lvcangetprog",         //14//CAN Program Number request | Yes
+"lvcangetinfo",         //15//Get LV-CAN info | Yes
+"getparam",             //16// getparam paramID // "getparam 1540",//8//Min Period      1540 4 0..2592000 sec | Yes
+"setparam",             //17// setparam paramID // "getparam 1540 20",//8//Min Period   1540 4 0..2592000 sec | Yes
+"flush",                //18//flush IMEI[15],APN[32],LOGIN[30],PASS[30],IP[31],PORT,MODE (0-TCP/1-UDP)//"flush ,internet.mts.ru,mts,mts,217.28.216.140,5527,0" | No
+"cpureset",             //19// | No
+"lvcansetprog",         //20//LVCANSETPROG      //"lvcansetprog 112" | Yes
+"readops",              //21//READ_OPS_LIST     //"readops 1","readops 2","readops 3" | Yes
+"deleterecords"         //22//Delete all records saved on FLASH | Yes
+};
 //--------------------   Commands for device FMB630/FM6320   ---------------------------------------
-const char *cmds[] = {
+const char *cmds1[] = {
 "getgps",       //0//Current GPS data and time | Yes//{"command":0}
 "setdigout",    //1//set DOUTX=1 на Y sec.//{"command":1, "relay":X, "time":Y} - 'включить реле № X на время Y секунд'
 "setdigout",    //2//set DOUTX=0 на Y sec.//{"command":2, "relay":X, "time":Y} - 'выключить реле № X на время Y секунд'
@@ -154,20 +181,14 @@ void MainWindow::LogSave(const char *func, QString st, bool pr)
     if (fil.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
         QString fw;
         if (pr) {
-            time_t it_ct = QDateTime::currentDateTime().toTime_t();
-            struct tm *ctimka = localtime(&it_ct);
-            fw.sprintf("%02d.%02d.%02d %02d:%02d:%02d | ",
-                        ctimka->tm_mday,
-                        ctimka->tm_mon+1,
-                        ctimka->tm_year+1900,
-                        ctimka->tm_hour,
-                        ctimka->tm_min,
-                        ctimka->tm_sec);
+            time_t ict = QDateTime::currentDateTime().toTime_t();
+            struct tm *ct = localtime(&ict);
+            fw.sprintf("%02d.%02d.%02d %02d:%02d:%02d | ", ct->tm_mday, ct->tm_mon+1, ct->tm_year+1900, ct->tm_hour, ct->tm_min, ct->tm_sec);
         }
         if (func) {
             fw.append("[");
             fw.append(func);
-            if (imei.length() > 0) fw.append(":"+imei);
+            if (imei.length() > 0) fw.append(":" + imei);
             fw.append("] ");
         }
         fw.append(st);
@@ -194,20 +215,38 @@ int MainWindow::MakeAvlPacket(void *buf, int command_id, char *par)
 {
 int ret = -1;
 uint8_t *uk = NULL, *tmp = NULL, *tp = NULL;
-uint8_t cnt = 0x01, ct, type = 5;
+uint8_t cnt = 0x01, ct, type = 5, max_cm;
 uint32_t alen, len;
 uint32_t tlen, crc = 0, dl = 0, cmd_len = 0;
 s_avl_cmd *hdr = NULL;
 char cds[max_cmd_len] = {0};
+const char *cmu = NULL;
 
-    if ((command_id < 0) || (command_id >= max_cmds)) return ret;
+    if (thecar.type == DEV_FM1110) {
+        max_cm = max_cmds0;
+        cmu = &cmds0[command_id][0];
+    } else {//DEV_FMB630, DEV_FM5300
+        max_cm = max_cmds1;
+        cmu = &cmds1[command_id][0];
+    }
 
-    sprintf(cds,"%s%s\r\n", &cmds[command_id][0], par);
+    if ((command_id < 0) || (command_id >= max_cm)) return ret;
+
+    //sprintf(cds, "%s%s\r\n", &cmds[command_id][0], par);
+    if (thecar.type > DEV_FM1110) {
+        if (command_id == 27) {//"lvcansetprog", //"setcanprog"  //27//LVCANSETPROG     //"lvcansetprog 112" | Yes//{"command":27}
+            if (thecar.type == DEV_FM5300) sprintf(cds, "setcanprog%s", par);//FM5300
+                                      else sprintf(cds, "lvcansetprog%s", par);//FMB630
+        } else if (command_id == 22) {//"lvcangetprog", //"getcanprog"  //22//CAN Program Number request | Yes //{"command":22}
+            if (thecar.type == DEV_FM5300) sprintf(cds, "getcanprog");//FM5300
+                                      else sprintf(cds, "lvcangetprog");//FMB630
+        } else sprintf(cds,"%s%s\r\n", cmu, par);
+    } else sprintf(cds,"%s%s\r\n", cmu, par);
 
 
     if (dbg > 2) {
         QString qcds; qcds.append(cds);
-        LogSave(__func__, qcds+"\n", 1);
+        LogSave(__func__, qcds + "\n", 1);
     }
 
     len = strlen(cds);
@@ -259,195 +298,338 @@ char *MainWindow::ShowTime(time_t *ct, char *bf)
     return &bf[0];
 }
 //----------------------------------------------------------------------------------------------------------------------------
-char *MainWindow::io_name(uint8_t id, char *st)//for FMB630 or FM6320 only
+char *MainWindow::io_name(uint8_t id, char *st, uint8_t dtype)
 {
 
-    switch (id) {
-        case 1  : sprintf(st,"DIN1"); break;
-        case 2  : sprintf(st,"DIN2"); break;
-        case 3  : sprintf(st,"DIN3"); break;
-        case 4  : sprintf(st,"DIN4"); break;
-        case 5  : sprintf(st,"DallasTempID5"); break;
-        case 6  : sprintf(st,"DallasTemp5"); break;
-        case 7  : sprintf(st,"DallasTempID6"); break;
-        case 8  : sprintf(st,"DallasTemp6"); break;
-        case 9  : sprintf(st,"AIN1"); break;
-        case 10 : sprintf(st,"AIN2"); break;
-        case 11 : sprintf(st,"AIN3"); break;
-        case 12 : sprintf(st,"CAN_ProgramNumber"); break;
-        case 13 : sprintf(st,"CAN_ModuleID"); break;
-        case 14 : sprintf(st,"CAN_EngineWorkTime"); break;
-        case 15 : sprintf(st,"CAN_EngineWorkTime(counted)"); break;
-        case 16 : sprintf(st,"CAN_TotalMileage"); break;
-        case 17 : sprintf(st,"CAN_FuelConsumed"); break;
-        case 18 : sprintf(st,"CAN_FuelRate"); break;
-        case 19 : sprintf(st,"CAN_AdBlueLevel(p)"); break;
-        case 20 : sprintf(st,"CAN_AdBlueLevel(l)"); break;
-        case 21 : sprintf(st,"GSM_slevel"); break;
-        case 22 : sprintf(st,"Profile"); break;
-        case 23 : sprintf(st,"CAN_EngineLoad"); break;
-        case 24 : sprintf(st,"Speed"); break;
-        case 25 : sprintf(st,"CAN_EngineTemp"); break;
-        case 26 : sprintf(st,"CAN_Axle1Load"); break;
-        case 27 : sprintf(st,"CAN_Axle2Load"); break;
-        case 28 : sprintf(st,"CAN_Axle3Load"); break;
-        case 29 : sprintf(st,"CAN_Axle4Load"); break;
-        case 30 : sprintf(st,"CAN_Speed"); break;
-        case 31 : sprintf(st,"CAN_Accelerator"); break;
-        case 32 : sprintf(st,"CAN_Axle5Load"); break;
-        case 33 : sprintf(st,"CAN_FuelConsumed"); break;
-        case 34 : sprintf(st,"CAN_FuelLevel(l)"); break;
-        case 35 : sprintf(st,"CAN_EngineRPM"); break;
-        case 36 : sprintf(st,"CAN_TotalMileage"); break;
-        case 37 : sprintf(st,"CAN_FuelLevel(p)"); break;
-        case 38 : sprintf(st,"CAN_ControlStateFlags"); break;
-        case 39 : sprintf(st,"CAN_AgriculturalMachineryFlags"); break;
-        case 40 : sprintf(st,"CAN_HarvestingTime"); break;
-        case 41 : sprintf(st,"CAN_AreaofHarvest"); break;
-        case 42 : sprintf(st,"CAN_MowingEfficiency"); break;
-        case 43 : sprintf(st,"CAN_GrainMownVolume"); break;
-        case 44 : sprintf(st,"CAN_GrainMoisture"); break;
-        case 45 : sprintf(st,"CAN_HarvestingDrumRPM"); break;
-        case 46 : sprintf(st,"CAN_GapUnderHarvestingDrum"); break;
-        case 47 : sprintf(st,"CAN_SecurityStateFlags"); break;
-        case 48 : sprintf(st,"CAN_TachoTotalVehicleDistance"); break;
-        case 49 : sprintf(st,"CAN_TripDistance"); break;
-        case 50 : sprintf(st,"DOUT3"); break;
-        case 51 : sprintf(st,"DOUT4"); break;
-        case 52 : sprintf(st,"CAN_TachoVehicleSpeed"); break;
-        case 53 : sprintf(st,"CAN_TachoDriverCardPresence"); break;
-        case 54 : sprintf(st,"CAN_Driver1States"); break;
-        case 55 : sprintf(st,"CAN_Driver2States"); break;
-        case 56 : sprintf(st,"CAN_Driver1ContinuousDrivingTime"); break;
-        case 57 : sprintf(st,"CAN_Driver2ContinuousDrivingTime"); break;
-        case 58 : sprintf(st,"CAN_Driver1CumulativeBreakTime"); break;
-        case 59 : sprintf(st,"CAN_Driver2CumulativeBreakTime"); break;
-        case 60 : sprintf(st,"CAN_Driver1DurationOfSelectedActivity"); break;
-        case 61 : sprintf(st,"CAN_Driver2DurationOfSelectedActivity"); break;
-        case 62 : sprintf(st,"DallasTempID1"); break;
-        case 63 : sprintf(st,"DallasTempID2"); break;
-        case 64 : sprintf(st,"DallasTempID3"); break;
-        case 65 : sprintf(st,"DallasTempID4"); break;
-        case 66 : sprintf(st,"ExternalVoltage"); break;
-        case 67 : sprintf(st,"BatteryVoltage"); break;
-        case 68 : sprintf(st,"BatteryCurrent"); break;
-        case 69 : sprintf(st,"GNSS_status"); break;
-        case 70 : sprintf(st,"PCBTemp"); break;
-        case 71 : sprintf(st,"GNSSStatus"); break;
-        case 72 : sprintf(st,"DallasTemp1"); break;
-        case 73 : sprintf(st,"DallasTemp2"); break;
-        case 74 : sprintf(st,"DallasTemp3"); break;
-        case 75 : sprintf(st,"DallasTemp4"); break;
-        case 76 : sprintf(st,"FuelCounter"); break;
-        case 77 : sprintf(st,"CAN_Driver2CumulativeDrivingTime"); break;
-        case 78 : sprintf(st,"iButtonID"); break;
+switch (dtype) {
+    case 3://FM6320
+    case 2://FMB630
+        switch (id) {
+            case 1  : sprintf(st,"DIN1"); break;
+            case 2  : sprintf(st,"DIN2"); break;
+            case 3  : sprintf(st,"DIN3"); break;
+            case 4  : sprintf(st,"DIN4"); break;
+            case 5  : sprintf(st,"DallasTempID5"); break;
+            case 6  : sprintf(st,"DallasTemp5"); break;
+            case 7  : sprintf(st,"DallasTempID6"); break;
+            case 8  : sprintf(st,"DallasTemp6"); break;
+            case 9  : sprintf(st,"AIN1"); break;
+            case 10 : sprintf(st,"AIN2"); break;
+            case 11 : sprintf(st,"AIN3"); break;
+            case 12 : sprintf(st,"CAN_ProgramNumber"); break;
+            case 13 : sprintf(st,"CAN_ModuleID"); break;
+            case 14 : sprintf(st,"CAN_EngineWorkTime"); break;
+            case 15 : sprintf(st,"CAN_EngineWorkTime(counted)"); break;
+            case 16 : sprintf(st,"CAN_TotalMileage"); break;
+            case 17 : sprintf(st,"CAN_FuelConsumed"); break;
+            case 18 : sprintf(st,"CAN_FuelRate"); break;
+            case 19 : sprintf(st,"CAN_AdBlueLevel(p)"); break;
+            case 20 : sprintf(st,"CAN_AdBlueLevel(l)"); break;
+            case 21 : sprintf(st,"GSM_slevel"); break;
+            case 22 : sprintf(st,"Profile"); break;
+            case 23 : sprintf(st,"CAN_EngineLoad"); break;
+            case 24 : sprintf(st,"Speed"); break;
+            case 25 : sprintf(st,"CAN_EngineTemp"); break;
+            case 26 : sprintf(st,"CAN_Axle1Load"); break;
+            case 27 : sprintf(st,"CAN_Axle2Load"); break;
+            case 28 : sprintf(st,"CAN_Axle3Load"); break;
+            case 29 : sprintf(st,"CAN_Axle4Load"); break;
+            case 30 : sprintf(st,"CAN_Speed"); break;
+            case 31 : sprintf(st,"CAN_Accelerator"); break;
+            case 32 : sprintf(st,"CAN_Axle5Load"); break;
+            case 33 : sprintf(st,"CAN_FuelConsumed"); break;
+            case 34 : sprintf(st,"CAN_FuelLevel(l)"); break;
+            case 35 : sprintf(st,"CAN_EngineRPM"); break;
+            case 36 : sprintf(st,"CAN_TotalMileage"); break;
+            case 37 : sprintf(st,"CAN_FuelLevel(p)"); break;
+            case 38 : sprintf(st,"CAN_ControlStateFlags"); break;
+            case 39 : sprintf(st,"CAN_AgriculturalMachineryFlags"); break;
+            case 40 : sprintf(st,"CAN_HarvestingTime"); break;
+            case 41 : sprintf(st,"CAN_AreaofHarvest"); break;
+            case 42 : sprintf(st,"CAN_MowingEfficiency"); break;
+            case 43 : sprintf(st,"CAN_GrainMownVolume"); break;
+            case 44 : sprintf(st,"CAN_GrainMoisture"); break;
+            case 45 : sprintf(st,"CAN_HarvestingDrumRPM"); break;
+            case 46 : sprintf(st,"CAN_GapUnderHarvestingDrum"); break;
+            case 47 : sprintf(st,"CAN_SecurityStateFlags"); break;
+            case 48 : sprintf(st,"CAN_TachoTotalVehicleDistance"); break;
+            case 49 : sprintf(st,"CAN_TripDistance"); break;
+            case 50 : sprintf(st,"DOUT3"); break;
+            case 51 : sprintf(st,"DOUT4"); break;
+            case 52 : sprintf(st,"CAN_TachoVehicleSpeed"); break;
+            case 53 : sprintf(st,"CAN_TachoDriverCardPresence"); break;
+            case 54 : sprintf(st,"CAN_Driver1States"); break;
+            case 55 : sprintf(st,"CAN_Driver2States"); break;
+            case 56 : sprintf(st,"CAN_Driver1ContinuousDrivingTime"); break;
+            case 57 : sprintf(st,"CAN_Driver2ContinuousDrivingTime"); break;
+            case 58 : sprintf(st,"CAN_Driver1CumulativeBreakTime"); break;
+            case 59 : sprintf(st,"CAN_Driver2CumulativeBreakTime"); break;
+            case 60 : sprintf(st,"CAN_Driver1DurationOfSelectedActivity"); break;
+            case 61 : sprintf(st,"CAN_Driver2DurationOfSelectedActivity"); break;
+            case 62 : sprintf(st,"DallasTempID1"); break;
+            case 63 : sprintf(st,"DallasTempID2"); break;
+            case 64 : sprintf(st,"DallasTempID3"); break;
+            case 65 : sprintf(st,"DallasTempID4"); break;
+            case 66 : sprintf(st,"ExternalVoltage"); break;
+            case 67 : sprintf(st,"BatteryVoltage"); break;
+            case 68 : sprintf(st,"BatteryCurrent"); break;
+            case 69 : sprintf(st,"GNSS_status"); break;
+            case 70 : sprintf(st,"PCBTemp"); break;
+            case 71 : sprintf(st,"GNSSStatus"); break;
+            case 72 : sprintf(st,"DallasTemp1"); break;
+            case 73 : sprintf(st,"DallasTemp2"); break;
+            case 74 : sprintf(st,"DallasTemp3"); break;
+            case 75 : sprintf(st,"DallasTemp4"); break;
+            case 76 : sprintf(st,"FuelCounter"); break;
+            case 77 : sprintf(st,"CAN_Driver2CumulativeDrivingTime"); break;
+            case 78 : sprintf(st,"iButtonID"); break;
 
-        case 108: sprintf(st,"CAN_Driver2IDHigh"); break;
+            case 108: sprintf(st,"CAN_Driver2IDHigh"); break;
 
-        case 140: sprintf(st,"CAN_Driver2IDLow"); break;
-        case 141: sprintf(st,"CAN_BatteryTemp"); break;
-        case 142: sprintf(st,"CAN_BatteryLevel(p)"); break;
-        case 143: sprintf(st,"CAN_DoorStatus"); break;
-        case 144: sprintf(st,"SD_status"); break;
-        case 145: sprintf(st,"Manual_1CAN1"); break;
-        case 146: sprintf(st,"Manual_1CAN2"); break;
-        case 147: sprintf(st,"Manual_1CAN3"); break;
-        case 148: sprintf(st,"Manual_1CAN4"); break;
-        case 149: sprintf(st,"Manual_1CAN5"); break;
-        case 150: sprintf(st,"Manual_1CAN6"); break;
-        case 151: sprintf(st,"Manual_1CAN7"); break;
-        case 152: sprintf(st,"Manual_1CAN8"); break;
-        case 153: sprintf(st,"Manual_1CAN9"); break;
-        case 154: sprintf(st,"Manual_1CAN10"); break;
-        case 155 : sprintf(st,"Geofence_zone_01"); break;
-        case 156 : sprintf(st,"Geofence_zone_02"); break;
-        case 157 : sprintf(st,"Geofence_zone_03"); break;
-        case 158 : sprintf(st,"Geofence_zone_04"); break;
-        case 159 : sprintf(st,"Geofence_zone_05"); break;
-        case 160 : sprintf(st,"Geofence_zone_06"); break;
-        case 161 : sprintf(st,"Geofence_zone_07"); break;
-        case 162 : sprintf(st,"Geofence_zone_08"); break;
-        case 163 : sprintf(st,"Geofence_zone_09"); break;
-        case 164 : sprintf(st,"Geofence_zone_10"); break;
-        case 165 : sprintf(st,"Geofence_zone_11"); break;
-        case 166 : sprintf(st,"Geofence_zone_12"); break;
-        case 167 : sprintf(st,"Geofence_zone_13"); break;
-        case 168 : sprintf(st,"Geofence_zone_14"); break;
-        case 169 : sprintf(st,"Geofence_zone_15"); break;
-        case 170 : sprintf(st,"Geofence_zone_16"); break;
-        case 171 : sprintf(st,"Geofence_zone_17"); break;
-        case 172 : sprintf(st,"Geofence_zone_18"); break;
-        case 173 : sprintf(st,"Geofence_zone_19"); break;
-        case 174 : sprintf(st,"Geofence_zone_20"); break;
-        case 175 : sprintf(st,"AutoGeofence"); break;
-        case 176 : sprintf(st,"CAN_DTCErrors"); break;
-        case 177 : sprintf(st,"CAN_DTCCodes"); break;
-        case 178 : sprintf(st,"NetworkType"); break;
-        case 179 : sprintf(st,"DOUT1"); break;
-        case 180 : sprintf(st,"DOUT2"); break;
-        case 181 : sprintf(st,"GNSS_PDOP"); break;
-        case 182 : sprintf(st,"GNSS_HDOP"); break;
+            case 140: sprintf(st,"CAN_Driver2IDLow"); break;
+            case 141: sprintf(st,"CAN_BatteryTemp"); break;
+            case 142: sprintf(st,"CAN_BatteryLevel(p)"); break;
+            case 143: sprintf(st,"CAN_DoorStatus"); break;
+            case 144: sprintf(st,"SD_status"); break;
+            case 145: sprintf(st,"Manual_1CAN1"); break;
+            case 146: sprintf(st,"Manual_1CAN2"); break;
+            case 147: sprintf(st,"Manual_1CAN3"); break;
+            case 148: sprintf(st,"Manual_1CAN4"); break;
+            case 149: sprintf(st,"Manual_1CAN5"); break;
+            case 150: sprintf(st,"Manual_1CAN6"); break;
+            case 151: sprintf(st,"Manual_1CAN7"); break;
+            case 152: sprintf(st,"Manual_1CAN8"); break;
+            case 153: sprintf(st,"Manual_1CAN9"); break;
+            case 154: sprintf(st,"Manual_1CAN10"); break;
+            case 155 : sprintf(st,"Geofence_zone_01"); break;
+            case 156 : sprintf(st,"Geofence_zone_02"); break;
+            case 157 : sprintf(st,"Geofence_zone_03"); break;
+            case 158 : sprintf(st,"Geofence_zone_04"); break;
+            case 159 : sprintf(st,"Geofence_zone_05"); break;
+            case 160 : sprintf(st,"Geofence_zone_06"); break;
+            case 161 : sprintf(st,"Geofence_zone_07"); break;
+            case 162 : sprintf(st,"Geofence_zone_08"); break;
+            case 163 : sprintf(st,"Geofence_zone_09"); break;
+            case 164 : sprintf(st,"Geofence_zone_10"); break;
+            case 165 : sprintf(st,"Geofence_zone_11"); break;
+            case 166 : sprintf(st,"Geofence_zone_12"); break;
+            case 167 : sprintf(st,"Geofence_zone_13"); break;
+            case 168 : sprintf(st,"Geofence_zone_14"); break;
+            case 169 : sprintf(st,"Geofence_zone_15"); break;
+            case 170 : sprintf(st,"Geofence_zone_16"); break;
+            case 171 : sprintf(st,"Geofence_zone_17"); break;
+            case 172 : sprintf(st,"Geofence_zone_18"); break;
+            case 173 : sprintf(st,"Geofence_zone_19"); break;
+            case 174 : sprintf(st,"Geofence_zone_20"); break;
+            case 175 : sprintf(st,"AutoGeofence"); break;
+            case 176 : sprintf(st,"CAN_DTCErrors"); break;
+            case 177 : sprintf(st,"CAN_DTCCodes"); break;
+            case 178 : sprintf(st,"NetworkType"); break;
+            case 179 : sprintf(st,"DOUT1"); break;
+            case 180 : sprintf(st,"DOUT2"); break;
+            case 181 : sprintf(st,"GNSS_PDOP"); break;
+            case 182 : sprintf(st,"GNSS_HDOP"); break;
 
-        case 199 : sprintf(st,"Odometer"); break;
-        case 200 : sprintf(st,"SleepMode"); break;
-        case 201 : sprintf(st,"LLS1_FuelLevel"); break;
-        case 202 : sprintf(st,"LLS1_FuelTemp"); break;
-        case 203 : sprintf(st,"LLS2_FuelLevel"); break;
-        case 204 : sprintf(st,"LLS2_FuelTemp"); break;
-        case 205 : sprintf(st,"CellID"); break;
-        case 206 : sprintf(st,"LAC"); break;
-        case 207 : sprintf(st,"RFID_ID_COM1"); break;
-        case 208 : sprintf(st,"Acceleration"); break;
-        case 209 : sprintf(st,"Decelaration"); break;
-        case 210 : sprintf(st,"LLS3_FuelLevel"); break;
-        case 211 : sprintf(st,"LLS3_FuelTemp"); break;
-        case 212 : sprintf(st,"LLS4_FuelLevel"); break;
-        case 213 : sprintf(st,"LLS4_FuelTemp"); break;
-        case 214 : sprintf(st,"LLS5_FuelLevel"); break;
-        case 215 : sprintf(st,"LLS5_FuelTemp"); break;
-        case 216 : sprintf(st,"TotalOdometer"); break;//sprintf(st,"Manual_2CAN1"); break;
-        case 217 : sprintf(st,"RFID_ID_COM2"); break;//sprintf(st,"Manual_2CAN2"); break;
-        case 218 : sprintf(st,"IMSI"); break;//sprintf(st,"Manual_2CAN3"); break;
-        case 219 : sprintf(st,"CC_ID_1"); break;//sprintf(st,"Manual_2CAN4"); break;
-        case 220 : sprintf(st,"CC_ID_2"); break;//sprintf(st,"Manual_2CAN5"); break;
-        case 221 : sprintf(st,"CC_ID_3"); break;//sprintf(st,"Manual_2CAN6"); break;
-        case 222 : sprintf(st,"DriverCard1IssuingMemberState"); break;//sprintf(st,"Manual_2CAN7"); break;
-        case 223 : sprintf(st,"DriverCard2IssuingMemberState"); break;//sprintf(st,"Manual_2CAN8"); break;
+            case 199 : sprintf(st,"Odometer"); break;
+            case 200 : sprintf(st,"SleepMode"); break;
+            case 201 : sprintf(st,"LLS1_FuelLevel"); break;
+            case 202 : sprintf(st,"LLS1_FuelTemp"); break;
+            case 203 : sprintf(st,"LLS2_FuelLevel"); break;
+            case 204 : sprintf(st,"LLS2_FuelTemp"); break;
+            case 205 : sprintf(st,"CellID"); break;
+            case 206 : sprintf(st,"LAC"); break;
+            case 207 : sprintf(st,"RFID_ID_COM1"); break;
+            case 208 : sprintf(st,"Acceleration"); break;
+            case 209 : sprintf(st,"Decelaration"); break;
+            case 210 : sprintf(st,"LLS3_FuelLevel"); break;
+            case 211 : sprintf(st,"LLS3_FuelTemp"); break;
+            case 212 : sprintf(st,"LLS4_FuelLevel"); break;
+            case 213 : sprintf(st,"LLS4_FuelTemp"); break;
+            case 214 : sprintf(st,"LLS5_FuelLevel"); break;
+            case 215 : sprintf(st,"LLS5_FuelTemp"); break;
+            case 216 : sprintf(st,"TotalOdometer"); break;//sprintf(st,"Manual_2CAN1"); break;
+            case 217 : sprintf(st,"RFID_ID_COM2"); break;//sprintf(st,"Manual_2CAN2"); break;
+            case 218 : sprintf(st,"IMSI"); break;//sprintf(st,"Manual_2CAN3"); break;
+            case 219 : sprintf(st,"CC_ID_1"); break;//sprintf(st,"Manual_2CAN4"); break;
+            case 220 : sprintf(st,"CC_ID_2"); break;//sprintf(st,"Manual_2CAN5"); break;
+            case 221 : sprintf(st,"CC_ID_3"); break;//sprintf(st,"Manual_2CAN6"); break;
+            case 222 : sprintf(st,"DriverCard1IssuingMemberState"); break;//sprintf(st,"Manual_2CAN7"); break;
+            case 223 : sprintf(st,"DriverCard2IssuingMemberState"); break;//sprintf(st,"Manual_2CAN8"); break;
 
-        case 226 : sprintf(st,"CAN_CNGStatus"); break;
-        case 227 : sprintf(st,"CAN_CNGUsed"); break;
-        case 228 : sprintf(st,"CAN_CNGLevel"); break;
-        case 229 : sprintf(st,"CAN_Driver1IDHigh"); break;
-        case 230 : sprintf(st,"CAN_Driver1IDLow"); break;
-        case 231 : sprintf(st,"VehicleRegistrationNumberPart1"); break;
-        case 232 : sprintf(st,"VehicleRegistrationNumberPart2"); break;
-        case 233 : sprintf(st,"VinNumberPart1"); break;
-        case 234 : sprintf(st,"VinNumberPart2"); break;
-        case 235 : sprintf(st,"VinNumberPart3"); break;
-        case 236 : sprintf(st,"AxisX"); break;
-        case 237 : sprintf(st,"AxisY"); break;
-        case 238 : sprintf(st,"AxisZ"); break;
-        case 239 : sprintf(st,"Ignition"); break;
-        case 240 : sprintf(st,"MovementSensor"); break;
-        case 241 : sprintf(st,"GSMOperator"); break;
-        case 242 : sprintf(st,"DataLimitHit"); break;
-        case 243 : sprintf(st,"ExcessiveIdlingDetected"); break;
-        case 244 : sprintf(st,"CameraImageGenerated"); break;
+            case 226 : sprintf(st,"CAN_CNGStatus"); break;
+            case 227 : sprintf(st,"CAN_CNGUsed"); break;
+            case 228 : sprintf(st,"CAN_CNGLevel"); break;
+            case 229 : sprintf(st,"CAN_Driver1IDHigh"); break;
+            case 230 : sprintf(st,"CAN_Driver1IDLow"); break;
+            case 231 : sprintf(st,"VehicleRegistrationNumberPart1"); break;
+            case 232 : sprintf(st,"VehicleRegistrationNumberPart2"); break;
+            case 233 : sprintf(st,"VinNumberPart1"); break;
+            case 234 : sprintf(st,"VinNumberPart2"); break;
+            case 235 : sprintf(st,"VinNumberPart3"); break;
+            case 236 : sprintf(st,"AxisX"); break;
+            case 237 : sprintf(st,"AxisY"); break;
+            case 238 : sprintf(st,"AxisZ"); break;
+            case 239 : sprintf(st,"Ignition"); break;
+            case 240 : sprintf(st,"MovementSensor"); break;
+            case 241 : sprintf(st,"GSMOperator"); break;
+            case 242 : sprintf(st,"DataLimitHit"); break;
+            case 243 : sprintf(st,"ExcessiveIdlingDetected"); break;
+            case 244 : sprintf(st,"CameraImageGenerated"); break;
 
-        case 246 : sprintf(st,"TowingDetection"); break;
-        case 247 : sprintf(st,"CrashDetection"); break;
-        case 248 : sprintf(st,"GeofenceZoneOverspeeding"); break;
-        case 249 : sprintf(st,"JammingDetection"); break;
-        case 250 : sprintf(st,"Trip"); break;
-        case 251 : sprintf(st,"Immobilizer"); break;
-        case 252 : sprintf(st,"AuthorizedDriving"); break;
-        case 253 : sprintf(st,"ECODrivingType"); break;
-        case 254 : sprintf(st,"ECODrivingValue"); break;
-        case 255 : sprintf(st,"OverSpeeding"); break;
-            default : sprintf(st,"%d",id);
-    }
+            case 246 : sprintf(st,"TowingDetection"); break;
+            case 247 : sprintf(st,"CrashDetection"); break;
+            case 248 : sprintf(st,"GeofenceZoneOverspeeding"); break;
+            case 249 : sprintf(st,"JammingDetection"); break;
+            case 250 : sprintf(st,"Trip"); break;
+            case 251 : sprintf(st,"Immobilizer"); break;
+            case 252 : sprintf(st,"AuthorizedDriving"); break;
+            case 253 : sprintf(st,"ECODrivingType"); break;
+            case 254 : sprintf(st,"ECODrivingValue"); break;
+            case 255 : sprintf(st,"OverSpeeding"); break;
+                default : sprintf(st,"%d",id);
+        }
+    break;
+    case 1://FM5300
+        switch (id) {
+            case 1  : sprintf(st,"DIN1"); break;//1 Digital Input Status 1  1 Logic: 0 / 1
+            case 2  : sprintf(st,"DIN2"); break;//2 Digital Input Status 2  1 Logic: 0 / 1
+            case 3  : sprintf(st,"DIN3"); break;//3 Digital Input Status 3  1 Logic: 0 / 1
+            case 4  : sprintf(st,"DIN4"); break;//4 Digital Input Status 4  1 Logic: 0 / 1
 
-    return st;
+            case 9  : sprintf(st,"AIN1"); break;//9  Analog Input 1 2 Voltage: mV, 0 – 30 V
+            case 10 : sprintf(st,"AIN2"); break;//10 Analog Input 2 2 Voltage: mV, 0 – 30 V
+            case 11 : sprintf(st,"AIN3"); break;//11 Analog Input 3 2 Voltage: mV, 0 – 30 V
+
+            case 19 : sprintf(st,"AIN4"); break;//19 Analog Input 4 2 Voltage: mV, 0 – 30 V
+
+            case 21 : sprintf(st,"GSM_slevel"); break;//21 GSM signal level 1 Value in scale 1 – 5
+            case 22 : sprintf(st,"Profile"); break;   //22 Actual profile   1 Value in scale 1 – 4
+
+            case 24 : sprintf(st,"Speedometer"); break;//   2 Value in km/h, 0 – xxx km/h
+
+            case 66 : sprintf(st,"ExternalVoltage"); break;//2 Voltage: mV, 0 – 30 V
+            case 67 : sprintf(st,"BatteryVoltage"); break;// 2 Voltage: mV
+            case 68 : sprintf(st,"BatteryCurrent"); break;// 2 Voltage: mA
+
+            case 70 : sprintf(st,"PCBTemp"); break;// 4 10 * Degrees ( °C )
+            case 71 : sprintf(st,"GNSSStatus"); break;// 1  0-off/ 1-no antenna (only when using NAVYS)/ 2- no fix/ 3-got fix/ 4-sleep/ 5-over current
+            case 72 : sprintf(st,"DallasTemp1"); break;//72 Dallas Temperature 1 4 10 * Degrees ( °C ), -55 - +115, if 3000 – Dallas error
+            case 73 : sprintf(st,"DallasTemp2"); break;//73 Dallas Temperature 2 4 10 * Degrees ( °C ), -55 - +115, if 3000 – Dallas error
+            case 74 : sprintf(st,"DallasTemp3"); break;//74 Dallas Temperature 3 4 10 * Degrees ( °C ), -55 - +115, if 3000 – Dallas error
+
+            case 76 : sprintf(st,"FuelCounter"); break;//76 Fuel Counter 4 Difference of generated impulses on two signal lines
+
+            case 78 : sprintf(st,"iButtonID"); break;//78 iButton ID2 8 iButton ID number
+
+            case 145: sprintf(st,"CAN0"); break;//145 CAN 0 Varying3 (1,2,4,8)      ID Specific data
+            case 146: sprintf(st,"CAN1"); break;//146 CAN 1 Varying                 ID Specific data
+            case 147: sprintf(st,"CAN2"); break;//147 CAN 2 Varying                 ID Specific data
+            case 148: sprintf(st,"CAN3"); break;//148 CAN 3 Varying                 ID Specific data
+            case 149: sprintf(st,"CAN4"); break;//149 CAN 4 Varying                 ID Specific data
+            case 150: sprintf(st,"CAN5"); break;//150 CAN 5 Varying                 ID Specific data
+            case 151: sprintf(st,"CAN6"); break;//151 CAN 6 Varying                 ID Specific data
+            case 152: sprintf(st,"CAN7"); break;//152 CAN 7 Varying                 ID Specific data
+            case 153: sprintf(st,"CAN8"); break;//153 CAN 8 Varying                 ID Specific data
+            case 154: sprintf(st,"CAN9"); break;//154 CAN 9 Varying                 ID Specific data
+            case 155 : sprintf(st,"Geofence_zone_01"); break;//155 Geofence zone 01 1 Event: 0 – target left zone, 1 – target entered zone
+            case 156 : sprintf(st,"Geofence_zone_02"); break;//156 Geofence zone 02 1 Event: 0 – target left zone, 1 – target entered zone
+            case 157 : sprintf(st,"Geofence_zone_03"); break;//157 Geofence zone 03 1 Event: 0 – target left zone, 1 – target entered zone
+            case 158 : sprintf(st,"Geofence_zone_04"); break;//158 Geofence zone 04 1 Event: 0 – target left zone, 1 – target entered zone
+            case 159 : sprintf(st,"Geofence_zone_05"); break;//159 Geofence zone 05 1 Event: 0 – target left zone, 1 – target entered zone
+            case 160 : sprintf(st,"Geofence_zone_06"); break;//160 Geofence zone 06 1 Event: 0 – target left zone, 1 – target entered zone
+            case 161 : sprintf(st,"Geofence_zone_07"); break;//161 Geofence zone 07 1 Event: 0 – target left zone, 1 – target entered zone
+            case 162 : sprintf(st,"Geofence_zone_08"); break;//162 Geofence zone 08 1 Event: 0 – target left zone, 1 – target entered zone
+            case 163 : sprintf(st,"Geofence_zone_09"); break;//163 Geofence zone 09 1 Event: 0 – target left zone, 1 – target entered zone
+            case 164 : sprintf(st,"Geofence_zone_10"); break;//164 Geofence zone 10 1 Event: 0 – target left zone, 1 – target entered zone
+            case 165 : sprintf(st,"Geofence_zone_11"); break;//165 Geofence zone 11 1 Event: 0 – target left zone, 1 – target entered zone
+            case 166 : sprintf(st,"Geofence_zone_12"); break;//166 Geofence zone 12 1 Event: 0 – target left zone, 1 – target entered zone
+            case 167 : sprintf(st,"Geofence_zone_13"); break;//167 Geofence zone 13 1 Event: 0 – target left zone, 1 – target entered zone
+            case 168 : sprintf(st,"Geofence_zone_14"); break;//168 Geofence zone 14 1 Event: 0 – target left zone, 1 – target entered zone
+            case 169 : sprintf(st,"Geofence_zone_15"); break;//169 Geofence zone 15 1 Event: 0 – target left zone, 1 – target entered zone
+            case 170 : sprintf(st,"Geofence_zone_16"); break;//170 Geofence zone 16 1 Event: 0 – target left zone, 1 – target entered zone
+            case 171 : sprintf(st,"Geofence_zone_17"); break;//171 Geofence zone 17 1 Event: 0 – target left zone, 1 – target entered zone
+            case 172 : sprintf(st,"Geofence_zone_18"); break;//172 Geofence zone 18 1 Event: 0 – target left zone, 1 – target entered zone
+            case 173 : sprintf(st,"Geofence_zone_19"); break;//173 Geofence zone 19 1 Event: 0 – target left zone, 1 – target entered zone
+            case 174 : sprintf(st,"Geofence_zone_20"); break;//174 Geofence zone 20 1 Event: 0 – target left zone, 1 – target entered zone
+            case 175 : sprintf(st,"AutoGeofence"); break;//175      Auto Geofence   1 Event: 0 – target left zone, 1 – target entered zone
+
+            case 181 : sprintf(st,"GNSS_PDOP"); break;//181 GPS PDOP 2 Probability * 10; 0-500
+            case 182 : sprintf(st,"GNSS_HDOP"); break;//182 GPS HDOP 2 Probability * 10; 0-500
+
+            case 199 : sprintf(st,"Odometer"); break;//199 Odometer         4 Distance between two records: m
+            case 200 : sprintf(st,"SleepMode"); break;//200 Deep Sleep      1 0 – not deep sleep mode, 1 – deep sleep mode
+            case 201 : sprintf(st,"FuelLevelMeter1"); break;//              2 Fuel level, measured by LLS sensor on COM1, in kvants or liters.
+            case 202 : sprintf(st,"FuelTemp1"); break;//                    1 Fuel temperature, measured by LLS sensor on COM1, in degrees Celsius.
+            case 203 : sprintf(st,"FuelLevelMeter2"); break;//              2 Fuel level, measured by LLS sensor on COM2, in kvants or liters.
+            case 204 : sprintf(st,"FuelTemp2"); break;//                    1 Fuel temperature, measured by LLS sensor on COM2, in degrees Celsius.
+            case 205 : sprintf(st,"CellID"); break;//205 Cell ID 2 GSM base station ID
+            case 206 : sprintf(st,"LAC"); break;//206 Area Code  2 Location Area code (LAC), it depends on GSM operator. It provides unique number which assigned to a set of base GSM stations. Max value: 65536
+            case 207 : sprintf(st,"RFID_ID"); break;//           8 Read RFID value, depending on RFID mode, values can be:for RFID mode in hexadecimal format, RFID M7 mode in decimal format.
+
+            case 211 : sprintf(st,"CAN_Speed"); break;//[1] 0-250 km/h
+            case 212 : sprintf(st,"CAN_Accelerator"); break;//[4]  0-100%
+            case 213 : sprintf(st,"CAN_FuelConsumed"); break;//[4] 0-99999999liters
+            case 215 : sprintf(st,"CAN_FuelLevel(l)"); break;//[4] 0-100 liters
+            case 216 : sprintf(st,"CAN_EngineRPM"); break;//[4]    0-8200 rpm
+            case 217 : sprintf(st,"CAN_TotalMileage"); break;//[4] 0-2145000000 meters
+            case 218 : sprintf(st,"CAN_FuelLevel(p)"); break;//[4] 0-100 %
+
+            case 240 : sprintf(st,"MovementSensor"); break;//240    Movement                1 0 – not moving, 1 – moving.
+            case 241 : sprintf(st,"GSMOperator"); break;//241       Current Operator Code   4 Currently used GSM Operator code
+
+            case 249 : sprintf(st,"IdlingState"); break;//          1 0 – not idling state, 1 – idling state
+            case 250 : sprintf(st,"Trip"); break;//                 1 1 – trip start, 0 – trip stop
+            case 251 : sprintf(st,"Immobilizer"); break;//          1 1 – iButton connected
+            case 252 : sprintf(st,"AuthorizedDriving"); break;//    1 1 – authorized iButton connected
+            case 253 : sprintf(st,"ECODrivingType"); break;//       1 1 – harsh acceleration, 2 – harsh braking, 3 - harsh cornering
+            case 254 : sprintf(st,"ECODrivingValue"); break;//      1 Depending on eco driving type: if harsh acceleration, braking and cornering – g*10 m/s2
+            case 255 : sprintf(st,"OverSpeeding"); break;//         1 At over speeding start km/h, at over speeding end km/h
+                default : sprintf(st,"%d",id);
+        }
+    break;
+    case 0://FM1110
+        switch (id) {
+            case 1  : sprintf(st,"DIN1"); break;
+            case 2  : sprintf(st,"DIN2"); break;
+            case 3  : sprintf(st,"DIN3"); break;
+            case 6  : sprintf(st,"AIN2"); break;
+            case 9  : sprintf(st,"AIN1"); break;
+            case 10 : sprintf(st,"SD Status"); break;
+            case 16 : sprintf(st,"TotalOdometer"); break;
+            case 21 : sprintf(st,"GSM_slevel"); break;
+            case 24 : sprintf(st,"Speed"); break;
+            case 66 : sprintf(st,"ExternalVoltage"); break;
+            case 67 : sprintf(st,"BatteryVoltage"); break;// mV
+            case 68 : sprintf(st,"BatteryCurrent"); break;// mA
+            case 69 : sprintf(st,"GNSS_status"); break;
+            case 72 : sprintf(st,"DallasTemp"); break;
+            case 78 : sprintf(st,"iButtonID"); break;
+            case 80 : sprintf(st,"Mode"); break;
+            case 81 : sprintf(st,"CAN_Speed"); break;
+            case 82 : sprintf(st,"CAN_Accelerator"); break;
+            case 83 : sprintf(st,"CAN_FuelConsumed"); break;
+            case 84 : sprintf(st,"CAN_FuelLevel(l)"); break;
+            case 85 : sprintf(st,"CAN_EngineRPM"); break;
+            case 87 : sprintf(st,"CAN_TotalMileage"); break;
+            case 89 : sprintf(st,"CAN_FuelLevel(p)"); break;
+            case 100: sprintf(st,"CAN_ProgramNumber"); break;
+            case 179: sprintf(st,"DOUT1"); break;
+            case 180: sprintf(st,"DOUT2"); break;
+            case 181: sprintf(st,"GNSS_PDOP"); break;
+            case 182: sprintf(st,"GNSS_HDOP"); break;
+            case 199: sprintf(st,"Odometer"); break;
+            case 200: sprintf(st,"DeepSleep"); break;
+            case 205: sprintf(st,"CellID"); break;
+            case 206: sprintf(st,"LAC"); break;
+            case 239: sprintf(st,"Ignition"); break;
+            case 240: sprintf(st,"MovementSensor"); break;
+            case 241: sprintf(st,"GSMOperator"); break;
+                default : sprintf(st,"%d",id);
+        }
+    break;
+}
+
+return st;
 }
 //----------------------------------------------------------------------------------------------------------------------------
 int MainWindow::ParseResp(QString *ack, char *out)
@@ -759,12 +941,6 @@ QString qstx, qstz;
         LogSave(__func__, qstx, 1);
     }
 
-    if ((codec_id != 8) && (codec_id != 12) && (codec_id != 13)) {
-        qstx.sprintf("Error codec_id = %u\n", codec_id);
-        LogSave(__func__, qstx, 1);
-        return -1;
-    }
-
     g_bin = (s_gps_pack_bin *)calloc(1, sizeof(s_gps_pack_bin));
     if (!g_bin) return -1;
 
@@ -1033,7 +1209,7 @@ QString qstx, qstz;
                     }
                     uk += el_dl;
                     memset(stz, 0, sizeof(stz));
-                    io_name(cmd_id, stz); qstz.clear(); qstz.append(stz);
+                    io_name(cmd_id, stz, thecar.type); qstz.clear(); qstz.append(stz);
                     switch (cmd_id) {
                         case 178: //"NetworkType"
                             jarr_io->insert(qstz, QJsonValue(net_type_name[dint8&1]));
@@ -1545,7 +1721,8 @@ void MainWindow::slotRdyPack(int ilen)
                     LogSave(NULL, qstx, 0);
                     codec_id = 0;
                 }
-            }
+            } else LogSave(__func__, "Error codec_id = " + QString::number(codec_id, 10), 1);
+
             delete jobj;
         }
     }
@@ -1558,10 +1735,14 @@ void MainWindow::slotRdyPack(int ilen)
 void MainWindow::on_sending_clicked()
 {
 QString stx = ui->cmd->text();
-int res, relz, timz, i, cid, result = 0;
+int res, relz, timz, i, cid, result = 0, oc_time = def_oc_time;
 char cmd_par[max_cmd_len] = {0};
 char chab;
 char st[4] = {0};
+uint8_t max_cmds = max_cmds1;
+int dtype = thecar.type;
+
+    if (dtype == DEV_FM1110) max_cmds = max_cmds0;
 
     if (client && stx.length() && (fd > 0)) {
         ui->textinfo->append(stx);
@@ -1576,71 +1757,100 @@ char st[4] = {0};
             cid = cmd_id;
             switch (cmd_id) {
                 case 1://SET ON DOUT
-                    if ((relz > 0) && (relz <= max_rel)) {
-                        sprintf(cmd_par, " ");
-                        for (i = 0; i < 4; i++) {
-                            if ((relz - 1) == i) chab = '1'; else chab = 'X';
-                            sprintf(cmd_par+strlen(cmd_par),"%c", chab);
-                        }
-                        if (timz > 0) {
+                    if (dtype > DEV_FM1110) {//SET ON DOUT
+                        if ((relz > 0) && (relz <= max_rel)) {
+                            sprintf(cmd_par, " ");
                             for (i = 0; i < 4; i++) {
-                                if ((relz - 1) == i) sprintf(cmd_par+strlen(cmd_par)," %d", timz);
-                                                else sprintf(cmd_par+strlen(cmd_par)," 0");
+                                if ((relz - 1) == i) chab = '1'; else chab = 'X';
+                                sprintf(cmd_par+strlen(cmd_par),"%c", chab);
                             }
-                        } else sprintf(cmd_par+strlen(cmd_par)," 0 0 0 0");
+                            if (timz > 0) {
+                                for (i = 0; i < 4; i++) {
+                                    if ((relz - 1) == i) sprintf(cmd_par+strlen(cmd_par)," %d", timz);
+                                                    else sprintf(cmd_par+strlen(cmd_par)," 0");
+                                }
+                            } else sprintf(cmd_par+strlen(cmd_par)," 0 0 0 0");
+                        }
+                    } else {
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par," %d 0", oc_time);//FM1110//"setdigout Dt 0"
+                                                    else sprintf(cmd_par," %d 0", relz);//FM1110//"setdigout 10 T 0"
                     }
                 break;
                 case 2://SET OFF DOUT
-                    if ((relz > 0) && (relz <= max_rel)) {
-                        sprintf(cmd_par, " ");
-                        for (i = 0; i < 4; i++) {
-                            if ((relz - 1) == i) chab = '0'; else chab = 'X';
-                            sprintf(cmd_par+strlen(cmd_par),"%c", chab);
+                    if (dtype > DEV_FM1110) {
+                        if ((relz > 0) && (relz <= max_rel)) {
+                            sprintf(cmd_par, " ");
+                            for (i = 0; i < 4; i++) {
+                                if ((relz - 1) == i) chab = '0'; else chab = 'X';
+                                sprintf(cmd_par+strlen(cmd_par),"%c", chab);
+                            }
+                            sprintf(cmd_par+strlen(cmd_par)," 0 0 0 0");
                         }
-                        sprintf(cmd_par+strlen(cmd_par)," 0 0 0 0");
                     }
                 break;
                 case 3:
-                    if (cmd_id == 3) cid = 33;//"SET_ON 1 0"
-                                else cid = 34;//"SET_OFF 1 0"
-                    sprintf(cmd_par, " 1 0");
+                    if (dtype > DEV_FM1110) {
+                        if (cmd_id == 3) cid = 33;//"SET_ON 1 0"
+                                    else cid = 34;//"SET_OFF 1 0"
+                        sprintf(cmd_par, " 1 0");
+                    } else {
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par," 0 %d", oc_time);//FM1110
+                                                    else sprintf(cmd_par," 0 %d", relz);//FM1110
+                    }
                 break;
                 case 4:
-                    if (cmd_id == 3) cid = 33;//"SET_ON 1 0"
-                                else cid = 34;//"SET_OFF 1 0"
-                    sprintf(cmd_par, " 1 0");
+                    if (dtype > DEV_FM1110) {
+                        if (cmd_id == 3) cid = 33;//"SET_ON 1 0"
+                                    else cid = 34;//"SET_OFF 1 0"
+                        sprintf(cmd_par, " 1 0");
+                    }
                 break;
                 case 5:
-                    cid = 33;
-                    sprintf(cmd_par, " 2 2");//"SET_ON 2 2"
+                    if (dtype > DEV_FM1110) {
+                        cid = 33;
+                        sprintf(cmd_par, " 2 2");//"SET_ON 2 2"
+                    } else {
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par," %d %d", oc_time, oc_time);//FM1110//"setdigout Dt 0"
+                                                    else sprintf(cmd_par," %d %d", relz, relz);//FM1110//"setdigout 10 T 0"
+                    }
                 break;
                 case 6:
                 case 7:
-                    cid = 33;
-                    if (cmd_id == 6) sprintf(cmd_par, " 3 18");//"SET_ON 3 18"
-                                else sprintf(cmd_par, " 3 2");//"SET_ON 3 2"
+                    if (dtype > DEV_FM1110) {
+                        cid = 33;
+                        if (cmd_id == 6) sprintf(cmd_par, " 3 18");//"SET_ON 3 18"
+                                    else sprintf(cmd_par, " 3 2");//"SET_ON 3 2"
+                    }
                 break;
                 case 8:
                 case 10:
-                    if (cmd_id == 8) cid = 33;//"SET_ON 4 0"
-                                else cid = 34;//"SET_OFF 4 0"
-                    sprintf(cmd_par, " 4 0");
+                    if (dtype > DEV_FM1110) {
+                        if (cmd_id == 8) cid = 33;//"SET_ON 4 0"
+                                    else cid = 34;//"SET_OFF 4 0"
+                        sprintf(cmd_par, " 4 0");
+                    }
                 break;
                 case 9:
-                    cid = 33;
-                    sprintf(cmd_par, " 4 %d", 5);//oc_time);//"SET_ON 4 Y"
+                    if (dtype > DEV_FM1110) {
+                        cid = 33;
+                        sprintf(cmd_par, " 4 %d", 5);//oc_time);//"SET_ON 4 Y"
+                    }
                 break;
                 case 11:
                 case 12:
-                    if (cmd_id == 11)  cid = 33;//"SET_ON 5 0"
-                                  else cid = 34;//"SET_OFF 5 0"
-                    sprintf(cmd_par, " 5 0");
+                    if (dtype > DEV_FM1110) {
+                        if (cmd_id == 11)  cid = 33;//"SET_ON 5 0"
+                                      else cid = 34;//"SET_OFF 5 0"
+                        sprintf(cmd_par, " 5 0");
+                    }
                 break;
                 case 13:
                 case 14:
-                    cid = 33;
-                    if (cmd_id == 13) sprintf(cmd_par, " 6 2");//"SET_ON 6 2"
-                                 else sprintf(cmd_par, " 7 2");//"SET_ON 7 2"
+                    if (dtype > DEV_FM1110) {
+                        cid = 33;
+                        if (cmd_id == 13) sprintf(cmd_par, " 6 2");//"SET_ON 6 2"
+                                     else sprintf(cmd_par, " 7 2");//"SET_ON 7 2"
+                    }
                 break;
                 case 41://"#GET REMIPX" X=1..4 - profile
                 case 42://"#GET AUPX" X=1..2 - sim slot
@@ -1649,7 +1859,7 @@ char st[4] = {0};
                 case 45://"#GET REPANGX" X=1..4
                 case 46://"#GET SENDPERIODX" X=1..4
                 case 47://"#GET REPMRX" X=1..4
-                        sprintf(cmd_par,"%d", relz);
+                    if (dtype > DEV_FM1110) sprintf(cmd_par,"%d", relz);
                 break;
                 case 48://"SET_ALL X1,Y1 X2,Y2 X3,Y3 X4,Y4 X5,Y5 X6,Y6 X7,Y7 X8,Y8"
                 break;
@@ -1667,7 +1877,6 @@ char st[4] = {0};
                 }
                 ui->textinfo->append(stx);
                 LogSave(__func__, stx + "\n", 1);
-
             }
             QTcpSocket *cliS = SClients[fd];
             cliS->write(to_cli, result);
