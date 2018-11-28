@@ -24,10 +24,11 @@
 //char const *vers = "1.2.1";//27.11.2018
 //char const *vers = "1.3";//27.11.2018
 //char const *vers = "1.3.1";//27.11.2018
-char const *vers = "1.4";//27.11.2018
+//char const *vers = "1.4";//27.11.2018
+char const *vers = "1.5";//28.11.2018
 
 
-const QString title = "GPS device (Teltonika) app.";
+const QString title = "GPS device (Teltonika) server application";
 const QString LogFileName = "logs.txt";
 uint8_t dbg = 2;
 const int time_wait_answer = 10000;//10 sec.
@@ -1312,9 +1313,10 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     ui->avto->setMovie(movie);
 
     s_car thecar = {0,"","",0};
-    db_name = dnm;
-    query = NULL;
+    db_name = dnm;  
     sql_err.setType(QSqlError::NoError);
+
+    query = NULL;
     openok = good = false;
     db = new QSqlDatabase(QSqlDatabase::addDatabase("QSQLITE"));
     db->setDatabaseName(*db_name);
@@ -1356,10 +1358,9 @@ bool ret = false;
     }
 
     if (openok) {// DB открыта, с ней можно работать
-        //ui->textinfo->append("DB open OK");
         sql_err.setType(QSqlError::NoError);
-        if (query->exec("SELECT * FROM `cars` order by `index`;")) {
-            //ui->textinfo->append("query->exec(SELECT) - OK");
+        QString req = "SELECT * FROM `cars` order by `index`;";
+        if (query->exec(req)) {
             s_car tmp = {0,"","",0};
             int ix = 0; bool ok;
             while (query->next()) {
@@ -1368,12 +1369,12 @@ bool ret = false;
                 tmp.imei = query->value(1).toString();
                 tmp.sim = query->value(2).toString();
                 tmp.type = query->value(3).toString().toInt(&ok, 10);
+                if (tmp.type > DEV_UNKNOWN) tmp.type = DEV_UNKNOWN;
                 QString stx = QString::number(ix, 10) + " : " +
                         QString::number(tmp.index, 10) + " | " +
                         tmp.imei + " | " +
                         tmp.sim + " | " +
                         QString::number(tmp.type);
-                //ui->textinfo->append(stx);
                 LogSave(__func__, stx, true);
                 if (imei.length()) {
                     if (imei == tmp.imei) {
@@ -1389,9 +1390,9 @@ bool ret = false;
             }
         } else {
             sql_err = query->lastError();
-            ui->textinfo->append("query->exec(SELECT) - Error");
+            ui->textinfo->append("query->exec(" + req + ") - Error");
         }
-    } else ui->textinfo->append("error open DB");
+    } else ui->textinfo->append("error open DB `" + *db_name + "`");
 
 
     if (openok) {
@@ -1436,6 +1437,7 @@ void MainWindow::ShowHideData(bool flg)
         movie->stop();
     }
     ui->l_imei->setEnabled(flg); ui->imei->setEnabled(flg);
+    ui->l_dev_name->setEnabled(flg); ui->dev_name->setEnabled(flg);
     ui->l_cmd->setEnabled(flg); ui->cmd->setEnabled(flg);
     ui->latitude->setEnabled(flg); ui->label->setEnabled(flg);
     ui->longitude->setEnabled(flg); ui->label_2->setEnabled(flg);
@@ -1579,6 +1581,7 @@ QString stx;
                         lenrecv = 0; memset(from_cli, 0, sizeof(from_cli)); rxdata = sizeof(s_avl_hdr);
                         faza = 1;
                         ShowHideData(auth);//true
+                        ui->dev_name->setText(dev_type_name[thecar.type]);
                         stx = "Client DevID : " +
                               QString::number(thecar.index, 10) + " | " +
                               thecar.imei + " | " +
