@@ -25,7 +25,8 @@
 //char const *vers = "1.3";//27.11.2018
 //char const *vers = "1.3.1";//27.11.2018
 //char const *vers = "1.4";//27.11.2018
-char const *vers = "1.5";//28.11.2018
+//char const *vers = "1.5";//28.11.2018
+char const *vers = "1.5.1";//28.11.2018
 
 
 const QString title = "GPS device (Teltonika) server application";
@@ -175,6 +176,25 @@ const uint16_t crc16tab[] = // CRC lookup table [B]polynomial 0xA001[/B]
 };
 #define UPDC16(ch, crc) (crc16tab[((crc) ^ (ch)) & 0xff] ^ ((crc) >> 8))
 
+int srv_port = 0;
+QString sdnm = "";
+
+//-----------------------------------------------------------------------
+void parse_param_start(char *param)
+{
+char *uk = NULL;
+
+    uk = strstr(param, "port=");
+    if (uk) {
+        uk += 5; srv_port = atoi(uk);
+    } else {
+        uk = strstr(param, "db=");
+        if (uk) {
+            uk += 3;
+            sdnm.clear(); sdnm.append(uk);
+        }
+    }
+}
 //-----------------------------------------------------------------------
 void MainWindow::LogSave(const char *func, QString st, bool pr)
 {
@@ -1293,6 +1313,7 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
 {
     ui->setupUi(this);
     //this->setFixedSize(this->size());
+    ui->l_ignition->setVisible(false);
 
     port = p;
     tcpServer = NULL;
@@ -1312,7 +1333,7 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     movie = new QMovie(car);
     ui->avto->setMovie(movie);
 
-    s_car thecar = {0,"","",0};
+    thecar = {0,"","",0};
     db_name = dnm;  
     sql_err.setType(QSqlError::NoError);
 
@@ -1407,6 +1428,7 @@ bool ret = false;
 //-----------------------------------------------------------------------
 void MainWindow::UpdatePins()
 {
+    ui->l_ignition->setVisible((bool)pins.din1);
     if (pins.msensor) {
         ui->avto->setVisible(true);
         movie->start();
@@ -1432,6 +1454,7 @@ void MainWindow::UpdatePins()
 //-----------------------------------------------------------------------
 void MainWindow::ShowHideData(bool flg)
 {
+    ui->l_ignition->setVisible((bool)pins.din1);
     if (!flg) {
         ui->avto->setVisible(false);
         movie->stop();
@@ -1476,10 +1499,9 @@ void MainWindow::on_starting_clicked()
         throw TheError(MyError);
     }
 
-    QString stx = "Server start, listen port " + QString::number(port, 10);
+    QString stx = "Server start with database `" + *db_name + "`, listen port " + QString::number(port, 10);
 
     connect(tcpServer, SIGNAL(newConnection()), this, SLOT(newuser()));
-
     if (!tcpServer->listen(QHostAddress("0.0.0.0"), port) && !server_status) {
         stx.clear();
         stx.append("Unable to start the server : " + tcpServer->errorString() + "\n");
@@ -1487,13 +1509,12 @@ void MainWindow::on_starting_clicked()
         server_status = 1;
         total_pack = total_cmd = 0;
     }
+
     statusBar()->clearMessage();
     statusBar()->showMessage(stx);
     LogSave(__func__, stx, true);
     ui->sending->setEnabled(false);
     memset((uint8_t *)&pins, 0, sizeof(s_pins));
-
-    //check_dev(&thecar);
 
 }
 //-----------------------------------------------------------------------
@@ -1582,7 +1603,7 @@ QString stx;
                         faza = 1;
                         ShowHideData(auth);//true
                         ui->dev_name->setText(dev_type_name[thecar.type]);
-                        stx = "Client DevID : " +
+                        stx = "From database `" + *db_name +"` client DevID : " +
                               QString::number(thecar.index, 10) + " | " +
                               thecar.imei + " | " +
                               thecar.sim  + " | " +
@@ -1715,11 +1736,9 @@ void MainWindow::slotRdyPack(int ilen)
             if (yes) {
                 if (!parse_data_from_dev(from_cli, ilen, jobj, &cmd_id)) {
                     QString qstx = QJsonDocument(*jobj).toJson(QJsonDocument::Compact) + "\n";
-                    //
                     time_t ict = QDateTime::currentDateTime().toTime_t();
                     struct tm *ct = localtime(&ict);
                     QString dt; dt.sprintf("%02d:%02d:%02d  ", ct->tm_hour, ct->tm_min, ct->tm_sec);
-                    //
                     ui->textinfo->append(dt + qstx);
                     LogSave(NULL, qstx, 0);
                     codec_id = 0;
@@ -1870,7 +1889,6 @@ int dtype = thecar.type;
             memset(to_cli, 0, sizeof(to_cli));
             result = MakeAvlPacket((uint8_t *)to_cli, cid, cmd_par);//make avl-packet for device
         } else result = -1;
-        //
         if (result > 0) {
             if (dbg) {
                 stx.clear(); stx.append("Command #" + QString::number(cmd_id,10) + " to device '" + imei + "' ready ("+QString::number(result,10) +") : ");
@@ -1891,7 +1909,6 @@ int dtype = thecar.type;
             }
             ui->sending->setEnabled(false);//block send button
         }
-        //
     }
 }
 //-----------------------------------------------------------------------

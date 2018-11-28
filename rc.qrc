@@ -2,5 +2,6 @@
     <qresource prefix="/">
         <file>png/a2.png</file>
         <file>png/transport6.gif</file>
+        <file>png/ignition1.png</file>
     </qresource>
 </RCC>

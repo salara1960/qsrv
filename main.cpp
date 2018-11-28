@@ -10,7 +10,10 @@ QString dnm("cars.s3db");
 
     setlocale(LC_ALL,"UTF8");
 
-    if (argc > 1) port = atoi(argv[1]);
+    if (argc > 1) parse_param_start(argv[1]);
+    if (argc > 2) parse_param_start(argv[2]);
+    if (srv_port > 0) port = srv_port;
+    if (sdnm.length() > 0) dnm = sdnm;
 
     try {
         QApplication srv(argc, argv);
