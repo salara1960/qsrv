@@ -36,7 +36,7 @@
 #define total_prio 4
 #define max_cmd_len 128
 #define max_cmds0 23// for FM1110
-#define max_cmds1 49//48//42//39//38//44//35//33//32//30//28//23 for FM5300, FM6320, FMB630
+#define max_cmds1 49// for FM5300, FM6320, FMB630
 #define max_rel 8
 #define max_dev_type 5
 #define max_rows 4
@@ -54,7 +54,7 @@ typedef enum {
 #pragma pack(push,1)
 typedef struct
 {
-    uint16_t len;                 // 2 bytes
+    uint16_t len;              // 2 bytes
     char imei[size_imei];      // 15 bytes
 } s_imei;
 typedef struct
@@ -215,6 +215,7 @@ signals:
     void sigWaitDone();
 
 private:
+
     bool client, auth, rdy;
     int MyError, port, rxdata, txdata, lenrecv;
     int cmd_id, fd, tmr_ack, tmr_sec, server_status;

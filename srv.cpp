@@ -28,7 +28,8 @@
 //char const *vers = "1.4";//27.11.2018
 //char const *vers = "1.5";//28.11.2018
 //char const *vers = "1.5.1";//28.11.2018
-char const *vers = "1.5.2";//28.11.2018
+//char const *vers = "1.5.2";//28.11.2018
+char const *vers = "1.6";//29.11.2018
 
 
 const QString title = "GPS device (Teltonika) server application";
@@ -324,8 +325,8 @@ char *MainWindow::io_name(uint8_t id, char *st, uint8_t dtype)
 {
 
 switch (dtype) {
-    case 3://FM6320
-    case 2://FMB630
+    case DEV_FM6320://3://FM6320
+    case DEV_FMB630://2://FMB630
         switch (id) {
             case 1  : sprintf(st,"DIN1"); break;
             case 2  : sprintf(st,"DIN2"); break;
@@ -511,7 +512,7 @@ switch (dtype) {
                 default : sprintf(st,"%d",id);
         }
     break;
-    case 1://FM5300
+    case DEV_FM5300://1://FM5300
         switch (id) {
             case 1  : sprintf(st,"DIN1"); break;//1 Digital Input Status 1  1 Logic: 0 / 1
             case 2  : sprintf(st,"DIN2"); break;//2 Digital Input Status 2  1 Logic: 0 / 1
@@ -609,7 +610,7 @@ switch (dtype) {
                 default : sprintf(st,"%d",id);
         }
     break;
-    case 0://FM1110
+    case DEV_FM1110://0://FM1110
         switch (id) {
             case 1  : sprintf(st,"DIN1"); break;
             case 2  : sprintf(st,"DIN2"); break;
@@ -958,7 +959,8 @@ QString qstx, qstz;
         LogSave(__func__, qstx, 1);
         return -1;
     } else {
-        qstx.sprintf("Parse AVL with len=%d from dev_type %d (", thecar.type, dline); qstx.append(dev_type_name[thecar.type] + ")\n");
+        qstx.sprintf("Parse AVL with len=%d from dev_type %d (", thecar.type, dline);
+        qstx.append(dev_type_name[thecar.type] + ")\n");
         LogSave(__func__, qstx, 1);
     }
 
@@ -986,7 +988,7 @@ QString qstx, qstz;
                         sta,
                         h_bin->codec_id, h_bin->codec_id,
                         h_bin->numbers_pack, h_bin->numbers_pack);
-        if ((codec_id == 12) || (codec_id == 13)) sprintf(stx+strlen(stx),"PacketType:\t%d\t%x\n", h_bin_ack->type, h_bin_ack->type);
+        if ((codec_id == 12) || (codec_id == 13)) sprintf(stx+strlen(stx),"PacketType:\t%d\n", h_bin_ack->type);
         qstx.clear(); qstx.append(stx);
         LogSave(NULL, qstx, 0);
     }
@@ -1077,7 +1079,7 @@ QString qstx, qstz;
                 qstx.clear(); qstx.append(stx);
                 LogSave(NULL, qstx, 0);
             }
-            jpack = new QJsonObject(); //jpack = json_object();
+            jpack = new QJsonObject();
             jpack->insert("TimeStamp", QJsonValue((qint32)tim));
             jpack->insert("Priority", QJsonValue((const char *)ptr));
             //-------------------------------   GPS  ------------------------------------------------------
@@ -1279,7 +1281,6 @@ QString qstx, qstz;
 
             if (jarr_io) {
                 jarr_io->insert("Stat", QJsonValue(*jsta));
-                ////json_object_set_new(jarr_io, "Fuel", json_integer(CalcFuel(fuel, ign)));
                 jpack->insert("ELEMENTS", QJsonValue(*jarr_io));
                 delete jarr_io; jarr_io = NULL;
             }
@@ -1584,7 +1585,6 @@ void MainWindow::newuser()
 void MainWindow::slotReadClient()
 {
 QTcpSocket *cliSocket = (QTcpSocket *)sender();
-//QString out;
 qint64 dl = 0;
 QString stx;
 
@@ -1710,7 +1710,7 @@ void MainWindow::slotRdyPack(int ilen)
 {
 
     if (ilen > 0) {
-        QJsonObject *jobj = new QJsonObject();//json_object();
+        QJsonObject *jobj = new QJsonObject();
         if (jobj) {
             bool yes = true;
             jobj->insert("DevName", QJsonValue(dev_type_name[thecar.type]));
@@ -1888,7 +1888,7 @@ int dtype = thecar.type;
                 break;
             }//switch(cmd_id)
             memset(to_cli, 0, sizeof(to_cli));
-            result = MakeAvlPacket((uint8_t *)to_cli, cid, cmd_par);//make avl-packet for device
+            result = MakeAvlPacket((uint8_t *)to_cli, cid, cmd_par);
         } else result = -1;
         if (result > 0) {
             if (dbg) {
@@ -1905,7 +1905,7 @@ int dtype = thecar.type;
             dev_wait_answer = 1;
             tmr_ack = startTimer(time_wait_answer);//wait ack from device until 10 sec
             if (tmr_ack <= 0) {
-                MyError |= 0x20;//start_timer_error
+                MyError |= 0x20;//start_timer error
                 throw TheError(MyError);
             }
             ui->sending->setEnabled(false);//block send button
