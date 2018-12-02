@@ -29,7 +29,8 @@
 //char const *vers = "1.5";//28.11.2018
 //char const *vers = "1.5.1";//28.11.2018
 //char const *vers = "1.5.2";//28.11.2018
-char const *vers = "1.6";//29.11.2018
+//char const *vers = "1.6";//29.11.2018
+char const *vers = "1.6.1";//29.11.2018
 
 
 const QString title = "GPS device (Teltonika) server application";
@@ -1485,7 +1486,7 @@ void MainWindow::ShowHideData(bool flg)
 //-----------------------------------------------------------------------
 void MainWindow::clearParam(int len)
 {
-    memset(to_cli, 0, sizeof(to_cli)); txdata = 0;
+    memset(to_cli, 0, sizeof(to_cli));     txdata = 0;
     memset(from_cli, 0, sizeof(from_cli)); rxdata = len; lenrecv = 0;
 }
 //-----------------------------------------------------------------------
@@ -1549,7 +1550,6 @@ void MainWindow::newuser()
     if (server_status) {
         QTcpSocket *cliSocket = tcpServer->nextPendingConnection();
         fd = cliSocket->socketDescriptor();
-        QString ssock; ssock.sprintf("%d", fd);
         QString stx;
         if (!client) {
             clearParam(sizeof(s_imei)); faza = 0; dev_wait_answer = 0;
@@ -1560,7 +1560,7 @@ void MainWindow::newuser()
             cmd_id = 0;
             CliUrl.clear(); CliUrl.append(cliSocket->peerAddress().toString() + ":" + QString::number(cliSocket->peerPort(), 10));
             client = true; rdy = false;
-            stx.append("New client '" + CliUrl + "' online, socket " + ssock);
+            stx.append("New client '" + CliUrl + "' online, socket " + QString::number(fd, 10));//ssock);
             SClients[fd] = cliSocket;
             connect(SClients[fd], SIGNAL(readyRead()), this, SLOT(slotReadClient()));
             connect(this, SIGNAL(sigCliDone(QTcpSocket *, int)), this, SLOT(slotCliDone(QTcpSocket *, int)));
@@ -1574,7 +1574,7 @@ void MainWindow::newuser()
             thecar.sim = "";
             thecar.type = 0;
         } else {
-            stx.append("New client '" + CliUrl + "' online, socket " + ssock + ", but client already present !\n");
+            stx.append("New client '" + CliUrl + "' online, socket " + QString::number(fd, 10) + ", but client already present !\n");
             cliSocket->close();
         }
         ui->textinfo->append(stx);
@@ -1618,6 +1618,7 @@ QString stx;
                         statusBar()->clearMessage(); statusBar()->showMessage(stx);
                         LogSave(__func__, stx, true);
                         slotCliDone(cliSocket, 1);
+                        lenrecv = 0; memset(from_cli, 0, sizeof(from_cli)); rxdata = sizeof(s_imei);
                         return;
                     }
                 }
