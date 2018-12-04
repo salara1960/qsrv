@@ -30,13 +30,18 @@
 //char const *vers = "1.5.1";//28.11.2018
 //char const *vers = "1.5.2";//28.11.2018
 //char const *vers = "1.6";//29.11.2018
-char const *vers = "1.6.1";//29.11.2018
+//char const *vers = "1.6.1";//29.11.2018
+//char const *vers = "1.7";//02.12.2018
+char const *vers = "1.8";//04.12.2018 - edit error code case
 
 
 const QString title = "GPS device (Teltonika) server application";
 const QString LogFileName = "logs.txt";
 uint8_t dbg = 2;
 const int time_wait_answer = 10000;//10 sec.
+
+int srv_port = 0;
+QString sdnm = "";
 
 char gradus = '^';
 const char *prio_name[] = {"Low","High","Panic","Security"};
@@ -180,9 +185,6 @@ const uint16_t crc16tab[] = // CRC lookup table [B]polynomial 0xA001[/B]
 };
 #define UPDC16(ch, crc) (crc16tab[((crc) ^ (ch)) & 0xff] ^ ((crc) >> 8))
 
-int srv_port = 0;
-QString sdnm = "";
-
 //-----------------------------------------------------------------------
 void parse_param_start(char *param)
 {
@@ -267,20 +269,19 @@ const char *cmu = NULL;
         } else sprintf(cds,"%s%s\r\n", cmu, par);
     } else sprintf(cds,"%s%s\r\n", cmu, par);
 
+    len = strlen(cds);
 
     if (dbg > 2) {
         QString qcds; qcds.append(cds);
         LogSave(__func__, qcds + "\n", 1);
     }
 
-    len = strlen(cds);
-
     alen = sizeof(s_avl_cmd) + ((len + 5) * cnt) + 5;
 
     tmp = (uint8_t *)calloc(1, alen + 1);
     if (tmp) {
         hdr = (s_avl_cmd *)tmp;
-        hdr->codec_id = 0x0c;
+        hdr->codec_id = CodecID12;//0x0c;
         hdr->cmd_cnt = cnt;
         uk = tmp + sizeof(s_avl_cmd);//uk to command_type
         ct = 0;
@@ -982,14 +983,14 @@ QString qstx, qstz;
 
     if (dbg >= 2) {
         memset(sta, 0, sizeof(sta));
-        if (codec_id == 8) len = sizeof(s_hdr_pack_bin); else len = sizeof(s_hdr_bin_ack);
+        if (codec_id == CodecID8) len = sizeof(s_hdr_pack_bin); else len = sizeof(s_hdr_bin_ack);
         for (i = 0; i < len; i++) sprintf(sta+strlen(sta),"%02X", *(uk+i));
         sprintf(stx,"HDR(%d):%s\nCodecID:\t%d\t%x\nTotalPackets:\t%d\t%x\n",
                         len,
                         sta,
                         h_bin->codec_id, h_bin->codec_id,
                         h_bin->numbers_pack, h_bin->numbers_pack);
-        if ((codec_id == 12) || (codec_id == 13)) sprintf(stx+strlen(stx),"PacketType:\t%d\n", h_bin_ack->type);
+        if ((codec_id == CodecID12) || (codec_id == CodecID13)) sprintf(stx+strlen(stx),"PacketType:\t%d\n", h_bin_ack->type);
         qstx.clear(); qstx.append(stx);
         LogSave(NULL, qstx, 0);
     }
@@ -999,12 +1000,12 @@ QString qstx, qstz;
     jarr = new QJsonArray();
 
     /*---------------------------------------------------------------------------------------*/
-    if ((codec_id == 12) || (codec_id == 13)) {//answer for command
+    if ((codec_id == CodecID12) || (codec_id == CodecID13)) {//answer for command
         if (dbg >= 2) LogSave(NULL, "DATA:\n", 0);
         n_cnt = 0; i = 0;
         len = ntohl(h_bin_ack->len);
         uk += sizeof(s_hdr_bin_ack);
-        if (codec_id == 13) {
+        if (codec_id == CodecID13) {
             memcpy(&dword, uk, 4);
             dword = ntohl(dword);
             uk += 4; len -= 4;
@@ -1039,7 +1040,7 @@ QString qstx, qstz;
         }
 
         if (jarr) {
-            if (codec_id == 13) js->insert("TimeStamp", QJsonValue((qint32)dword));
+            if (codec_id == CodecID13) js->insert("TimeStamp", QJsonValue((qint32)dword));
             js->insert("DATA", QJsonValue(*jarr));
             js->insert("Status", QJsonValue(i));
             delete jarr; jarr = NULL;
@@ -1338,7 +1339,6 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     thecar = {0,"","",0};
     db_name = dnm;  
     sql_err.setType(QSqlError::NoError);
-
     query = NULL;
     openok = good = false;
     db = new QSqlDatabase(QSqlDatabase::addDatabase("QSQLITE"));
@@ -1633,12 +1633,12 @@ QString stx;
                     rxdata = ntohl(hdr->len) + 4;
                     if (rxdata > max_buf) {
                         rxdata = max_buf;
-                        MyError |= 0x10;//avl_pack len > max_buf
+                        MyError |= 4;//avl_pack len > max_buf
                     }
                     lenrecv = 0; memset(from_cli, 0, sizeof(from_cli));
                     rdy = true;
                 }
-            } else MyError |= 4;//auth OFF
+            } else MyError |= 2;//auth OFF
         break;
     }
 
@@ -1649,8 +1649,8 @@ QString stx;
             codec_id = from_cli[0];
             cnt_pack = from_cli[1];
             switch (codec_id) {
-                case 8: total_pack++; break;
-                case 12: case 13: total_cmd++; break;
+                case CodecID8: total_pack++; break;
+                case CodecID12: case CodecID13: total_cmd++; break;
             }
             uint16_t ks_in = *(uint16_t *)(from_cli + lenrecv - 2); ks_in = ntohs(ks_in);
             uint16_t ks_calc = ks((uint8_t *)from_cli, lenrecv - 4);
@@ -1719,12 +1719,12 @@ void MainWindow::slotRdyPack(int ilen)
             jobj->insert("ServerTime",QJsonValue((qint32)time(NULL)));
             jobj->insert("FromAddr", QJsonValue(CliUrl));
             switch (codec_id) {
-                case 8:
+                case CodecID8:
                     seq_number++;
                     jobj->insert("SeqNumber", QJsonValue(seq_number));
                 break;
-                case 12:
-                case 13:
+                case CodecID12:
+                case CodecID13:
                     cmd_seq_number++;
                     jobj->insert("SeqNumber",QJsonValue(cmd_seq_number));
                     jobj->insert("Command", QJsonValue(cmd_id));
@@ -1906,7 +1906,7 @@ int dtype = thecar.type;
             dev_wait_answer = 1;
             tmr_ack = startTimer(time_wait_answer);//wait ack from device until 10 sec
             if (tmr_ack <= 0) {
-                MyError |= 0x20;//start_timer error
+                MyError |= 8;//start_timer error
                 throw TheError(MyError);
             }
             ui->sending->setEnabled(false);//block send button

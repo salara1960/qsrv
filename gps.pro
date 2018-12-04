@@ -1,10 +1,10 @@
 #-------------------------------------------------
 #
-# Project created by QtCreator 2018-11-14T10:09:47
+# Project created by QtCreator 2018-11-14T10:04:46
 #
 #-------------------------------------------------
 
-QT       += core gui widgets network
+QT       += core gui widgets network sql
 
 TARGET = gps
 TEMPLATE = app

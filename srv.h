@@ -41,6 +41,9 @@
 #define max_dev_type 5
 #define max_rows 4
 #define def_oc_time 2
+#define CodecID8 8
+#define CodecID12 12
+#define CodecID13 13
 //********************************************************************************
 
 typedef enum {
