@@ -32,7 +32,8 @@
 //char const *vers = "1.6";//29.11.2018
 //char const *vers = "1.6.1";//29.11.2018
 //char const *vers = "1.7";//02.12.2018
-char const *vers = "1.8";//04.12.2018 - edit error code case
+//char const *vers = "1.8";//04.12.2018 - edit error code case
+char const *vers = "1.9";//06.12.2018 - fixed bug in parser command
 
 
 const QString title = "GPS device (Teltonika) server application";
@@ -657,7 +658,7 @@ switch (dtype) {
 return st;
 }
 //----------------------------------------------------------------------------------------------------------------------------
-int MainWindow::ParseResp(QString *ack, char *out)
+int MainWindow::ParseResp(QString ack, char *out)
 {
 int ret = -1, param = -1, relay = -1, val = 0xffff0000;
 QJsonParseError err;
@@ -666,7 +667,7 @@ char tp[max_cmd_len] = {0};
 int arr_len = 0, ct = 0;
 
 
-    buf.append(*ack);
+    buf.append(ack);
     QJsonDocument jdoc= QJsonDocument::fromJson(buf , &err);
     if (err.error != QJsonParseError::NoError) {
         if (dbg) {
@@ -693,7 +694,8 @@ int arr_len = 0, ct = 0;
         if (tmp.isUndefined()) tmp = obj->value(srv_command_relay);//"relay";
         if (!tmp.isUndefined()) {
             if (tmp.isString()) {//is_string
-                sprintf(tp+strlen(tp)," %s", (char *)tmp.toString().data());
+                buf.clear(); buf.append(tmp.toString());
+                sprintf(tp+strlen(tp)," %s", buf.data());
             } else {//is_integer
                 param = tmp.toInt();
                 relay = param & 0xff;
@@ -703,7 +705,8 @@ int arr_len = 0, ct = 0;
                     if (tmp.isUndefined()) tmp = obj->value(srv_command_time);//"time";
                     if (!tmp.isUndefined()) {
                         if (tmp.isString()) {
-                            sprintf(tp+strlen(tp)," %s", (char *)tmp.toString().data());
+                            buf.clear(); buf.append(tmp.toString());
+                            sprintf(tp+strlen(tp)," %s", buf.data());
                         } else if (tmp.isDouble()) {
                             sprintf(tp+strlen(tp)," %f", tmp.toDouble());
                         } else if (tmp.isArray()) {
@@ -1772,7 +1775,7 @@ int dtype = thecar.type;
         ui->textinfo->append(stx);
         LogSave(__func__, stx, 1);
 
-        res = ParseResp(&stx, cmd_par);
+        res = ParseResp(stx, cmd_par);
         relz = (res >> 8) & 0xff;
         timz = res >> 16;
         res &= 0xff;

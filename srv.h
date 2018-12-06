@@ -187,7 +187,7 @@ public slots:
     int MakeAvlPacket(void *, int, char *);
     char *ShowTime(time_t *, char *);
     char *io_name(uint8_t, char *, uint8_t);
-    int ParseResp(QString *, char *);
+    int ParseResp(QString, char *);
     int CalcFuel(uint16_t, uint8_t);
     QJsonObject *ConvertStrToJsonObject(char *, int *);
     int parse_data_from_dev(char *, int, QJsonObject *, int *);
