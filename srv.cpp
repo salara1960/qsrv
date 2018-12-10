@@ -33,7 +33,8 @@
 //char const *vers = "1.6.1";//29.11.2018
 //char const *vers = "1.7";//02.12.2018
 //char const *vers = "1.8";//04.12.2018 - edit error code case
-char const *vers = "1.9";//06.12.2018 - fixed bug in parser command
+//char const *vers = "1.9";//06.12.2018 - fixed bug in parse command
+char const *vers = "2.0";//10.12.2018 - minor changes : add database error codes
 
 
 const QString title = "GPS device (Teltonika) server application";
@@ -261,10 +262,10 @@ const char *cmu = NULL;
     if ((command_id < 0) || (command_id >= max_cm)) return ret;
 
     if (thecar.type > DEV_FM1110) {
-        if (command_id == 27) {//"lvcansetprog", //"setcanprog"  //27//LVCANSETPROG     //"lvcansetprog 112" | Yes//{"command":27}
+        if (command_id == 27) {// set can_prog
             if (thecar.type == DEV_FM5300) sprintf(cds, "setcanprog%s", par);//FM5300
                                       else sprintf(cds, "lvcansetprog%s", par);//FMB630
-        } else if (command_id == 22) {//"lvcangetprog", //"getcanprog"  //22//CAN Program Number request | Yes //{"command":22}
+        } else if (command_id == 22) {//get can_prog
             if (thecar.type == DEV_FM5300) sprintf(cds, "getcanprog");//FM5300
                                       else sprintf(cds, "lvcangetprog");//FMB630
         } else sprintf(cds,"%s%s\r\n", cmu, par);
@@ -327,7 +328,7 @@ char *MainWindow::ShowTime(time_t *ct, char *bf)
 char *MainWindow::io_name(uint8_t id, char *st, uint8_t dtype)
 {
 
-switch (dtype) {
+  switch (dtype) {
     case DEV_FM6320://3://FM6320
     case DEV_FMB630://2://FMB630
         switch (id) {
@@ -653,7 +654,7 @@ switch (dtype) {
                 default : sprintf(st,"%d",id);
         }
     break;
-}
+  }
 
 return st;
 }
@@ -741,10 +742,9 @@ int arr_len = 0, ct = 0;
     return ret;
 }
 //----------------------------------------------------------------------------------------------------------------------------
-int MainWindow::CalcFuel(uint16_t mv, uint8_t ign)
+int MainWindow::CalcFuel(uint16_t adc, uint8_t ign)
 {
 int ret = -1;
-uint16_t adc = mv;
 
     if (ign) {
              if (adc <= 750) ret = 42;
@@ -1312,7 +1312,7 @@ QString qstx, qstz;
 
 //----------------------------------------------------------------------------------------------------------------------------
 
-MainWindow::TheError::TheError(int err) { code = err; }
+MainWindow::TheError::TheError(int err) { code = err; }//error class descriptor
 
 //----------------------------------------------------------------------------------------------------------------------------
 MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(parent), ui(new Ui::MainWindow)
@@ -1323,6 +1323,8 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
 
     port = p;
     tcpServer = NULL;
+    query = NULL;
+    db = NULL;
     MyError = 0;
     client = auth = false;
     imei.clear(); CliUrl.clear();
@@ -1339,15 +1341,27 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     movie = new QMovie(car);
     ui->avto->setMovie(movie);
 
-    thecar = {0,"","",0};
+    thecar = {0, "", "", 0};
     db_name = dnm;  
     sql_err.setType(QSqlError::NoError);
     query = NULL;
     openok = good = false;
     db = new QSqlDatabase(QSqlDatabase::addDatabase("QSQLITE"));
+    if (!db) {
+        MyError |= 0x10;//create database object error
+        throw TheError(MyError);
+    }
     db->setDatabaseName(*db_name);
     openok = db->open();
+    if (!openok) {
+        MyError |= 0x20;//open database error
+        throw TheError(MyError);
+    }
     query = new QSqlQuery(*db);
+    if (!query) {
+        MyError |= 0x40;//create query object error
+        throw TheError(MyError);
+    }
 
 }
 //-----------------------------------------------------------------------
@@ -1387,7 +1401,7 @@ bool ret = false;
         sql_err.setType(QSqlError::NoError);
         QString req = "SELECT * FROM `cars` order by `index`;";
         if (query->exec(req)) {
-            s_car tmp = {0,"","",0};
+            s_car tmp = {0, "", "", 0};
             int ix = 0; bool ok;
             while (query->next()) {
                 ix++;
@@ -1627,7 +1641,7 @@ QString stx;
                 }
             }
         break;
-        case 1://wait header pack from device
+        case 1://wait header of packet from device
             if (auth) {
                 dl = cliSocket->read(from_cli + lenrecv, rxdata - lenrecv);
                 lenrecv += dl;
@@ -1789,18 +1803,18 @@ int dtype = thecar.type;
                             sprintf(cmd_par, " ");
                             for (i = 0; i < 4; i++) {
                                 if ((relz - 1) == i) chab = '1'; else chab = 'X';
-                                sprintf(cmd_par+strlen(cmd_par),"%c", chab);
+                                sprintf(cmd_par+strlen(cmd_par), "%c", chab);
                             }
                             if (timz > 0) {
                                 for (i = 0; i < 4; i++) {
-                                    if ((relz - 1) == i) sprintf(cmd_par+strlen(cmd_par)," %d", timz);
-                                                    else sprintf(cmd_par+strlen(cmd_par)," 0");
+                                    if ((relz - 1) == i) sprintf(cmd_par+strlen(cmd_par), " %d", timz);
+                                                    else sprintf(cmd_par+strlen(cmd_par), " 0");
                                 }
                             } else sprintf(cmd_par+strlen(cmd_par)," 0 0 0 0");
                         }
                     } else {
-                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par," %d 0", oc_time);//FM1110//"setdigout Dt 0"
-                                                    else sprintf(cmd_par," %d 0", relz);//FM1110//"setdigout 10 T 0"
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " %d 0", oc_time);//FM1110//"setdigout Dt 0"
+                                                    else sprintf(cmd_par, " %d 0", relz);//FM1110//"setdigout 10 T 0"
                     }
                 break;
                 case 2://SET OFF DOUT
@@ -1809,7 +1823,7 @@ int dtype = thecar.type;
                             sprintf(cmd_par, " ");
                             for (i = 0; i < 4; i++) {
                                 if ((relz - 1) == i) chab = '0'; else chab = 'X';
-                                sprintf(cmd_par+strlen(cmd_par),"%c", chab);
+                                sprintf(cmd_par+strlen(cmd_par), "%c", chab);
                             }
                             sprintf(cmd_par+strlen(cmd_par)," 0 0 0 0");
                         }
@@ -1821,8 +1835,8 @@ int dtype = thecar.type;
                                     else cid = 34;//"SET_OFF 1 0"
                         sprintf(cmd_par, " 1 0");
                     } else {
-                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par," 0 %d", oc_time);//FM1110
-                                                    else sprintf(cmd_par," 0 %d", relz);//FM1110
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " 0 %d", oc_time);//FM1110
+                                                    else sprintf(cmd_par, " 0 %d", relz);//FM1110
                     }
                 break;
                 case 4:
@@ -1837,8 +1851,8 @@ int dtype = thecar.type;
                         cid = 33;
                         sprintf(cmd_par, " 2 2");//"SET_ON 2 2"
                     } else {
-                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par," %d %d", oc_time, oc_time);//FM1110//"setdigout Dt 0"
-                                                    else sprintf(cmd_par," %d %d", relz, relz);//FM1110//"setdigout 10 T 0"
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " %d %d", oc_time, oc_time);//FM1110//"setdigout Dt 0"
+                                                    else sprintf(cmd_par, " %d %d", relz, relz);//FM1110//"setdigout 10 T 0"
                     }
                 break;
                 case 6:
@@ -1891,6 +1905,7 @@ int dtype = thecar.type;
                 case 48://"SET_ALL X1,Y1 X2,Y2 X3,Y3 X4,Y4 X5,Y5 X6,Y6 X7,Y7 X8,Y8"
                 break;
             }//switch(cmd_id)
+
             memset(to_cli, 0, sizeof(to_cli));
             result = MakeAvlPacket((uint8_t *)to_cli, cid, cmd_par);
         } else result = -1;
