@@ -135,7 +135,6 @@ typedef struct
 } s_pins;
 #pragma pack(pop)
 
-#pragma pack(push,1)
 typedef struct
 {
     int index;
@@ -143,7 +142,6 @@ typedef struct
     QString sim;
     uint8_t type;
 } s_car;
-#pragma pack(pop)
 
 //********************************************************************************
 

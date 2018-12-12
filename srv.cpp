@@ -34,7 +34,8 @@
 //char const *vers = "1.7";//02.12.2018
 //char const *vers = "1.8";//04.12.2018 - edit error code case
 //char const *vers = "1.9";//06.12.2018 - fixed bug in parse command
-char const *vers = "2.0";//10.12.2018 - minor changes : add database error codes
+//char const *vers = "2.0";//10.12.2018 - minor changes : add database error codes
+char const *vers = "2.1";//12.12.2018 - minor changes : add gui effects
 
 
 const QString title = "GPS device (Teltonika) server application";
@@ -1321,6 +1322,8 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     //this->setFixedSize(this->size());
     ui->l_ignition->setVisible(false);
 
+    this->setWindowOpacity(0.9);
+
     port = p;
     tcpServer = NULL;
     query = NULL;
@@ -1479,15 +1482,15 @@ void MainWindow::ShowHideData(bool flg)
         ui->avto->setVisible(false);
         movie->stop();
     }
-    ui->l_imei->setEnabled(flg); ui->imei->setEnabled(flg);
+    ui->l_imei->setEnabled(flg);     ui->imei->setEnabled(flg);
     ui->l_dev_name->setEnabled(flg); ui->dev_name->setEnabled(flg);
-    ui->l_cmd->setEnabled(flg); ui->cmd->setEnabled(flg);
-    ui->latitude->setEnabled(flg); ui->label->setEnabled(flg);
-    ui->longitude->setEnabled(flg); ui->label_2->setEnabled(flg);
-    ui->altitude->setEnabled(flg); ui->label_3->setEnabled(flg);
-    ui->angle->setEnabled(flg); ui->label_4->setEnabled(flg);
-    ui->sat->setEnabled(flg); ui->label_5->setEnabled(flg);
-    ui->speed->setEnabled(flg); ui->label_6->setEnabled(flg);
+    ui->l_cmd->setEnabled(flg);      ui->cmd->setEnabled(flg);
+    ui->latitude->setEnabled(flg);   ui->label->setEnabled(flg);
+    ui->longitude->setEnabled(flg);  ui->label_2->setEnabled(flg);
+    ui->altitude->setEnabled(flg);   ui->label_3->setEnabled(flg);
+    ui->angle->setEnabled(flg);      ui->label_4->setEnabled(flg);
+    ui->sat->setEnabled(flg);        ui->label_5->setEnabled(flg);
+    ui->speed->setEnabled(flg);      ui->label_6->setEnabled(flg);
     ui->din1->setEnabled(flg);
     ui->din2->setEnabled(flg);
     ui->din3->setEnabled(flg);
@@ -1496,9 +1499,9 @@ void MainWindow::ShowHideData(bool flg)
     ui->dout2->setEnabled(flg);
     ui->dout3->setEnabled(flg);
     ui->dout4->setEnabled(flg);
-    ui->ain1->setEnabled(flg); ui->l_ain1->setEnabled(flg);
-    ui->ain2->setEnabled(flg); ui->l_ain2->setEnabled(flg);
-    ui->ain3->setEnabled(flg); ui->l_ain3->setEnabled(flg);
+    ui->ain1->setEnabled(flg);       ui->l_ain1->setEnabled(flg);
+    ui->ain2->setEnabled(flg);       ui->l_ain2->setEnabled(flg);
+    ui->ain3->setEnabled(flg);       ui->l_ain3->setEnabled(flg);
 }
 //-----------------------------------------------------------------------
 void MainWindow::clearParam(int len)
@@ -1587,9 +1590,9 @@ void MainWindow::newuser()
             ui->sending->setEnabled(true);
             memset((uint8_t *)&pins, 0, sizeof(s_pins));
             thecar.index = 0;
-            thecar.imei = "";
-            thecar.sim = "";
-            thecar.type = 0;
+            thecar.imei  = "";
+            thecar.sim   = "";
+            thecar.type  = 0;
         } else {
             stx.append("New client '" + CliUrl + "' online, socket " + QString::number(fd, 10) + ", but client already present !\n");
             cliSocket->close();

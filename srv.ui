@@ -194,6 +194,9 @@
           <pointsize>12</pointsize>
          </font>
         </property>
+        <property name="styleSheet">
+         <string notr="true"/>
+        </property>
         <property name="alignment">
          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
         </property>
@@ -1106,11 +1109,9 @@ background-color:rgb(226, 226, 226)}</string>
         <pointsize>11</pointsize>
        </font>
       </property>
-      <property name="autoFillBackground">
-       <bool>false</bool>
-      </property>
       <property name="styleSheet">
-       <string notr="true"/>
+       <string notr="true">background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(222, 222, 222, 255), stop:1 rgba(112,112,112,255));
+color: rgb(0, 0, 0);</string>
       </property>
      </widget>
     </item>
@@ -1263,6 +1264,10 @@ background-color:rgb(226, 226, 226)}</string>
      </widget>
     </item>
    </layout>
+   <zorder>sending</zorder>
+   <zorder>starting</zorder>
+   <zorder>stoping</zorder>
+   <zorder>textinfo</zorder>
   </widget>
   <widget class="QStatusBar" name="statusBar">
    <property name="minimumSize">
