@@ -26,6 +26,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QListWidget>
 
 //********************************************************************************
 #define size_imei 15
@@ -180,6 +181,7 @@ public:
 
 public slots:
 
+    void PrnTextInfo(QString);
     void LogSave(const char *, QString, bool);
     uint16_t ks(uint8_t *, int);
     int MakeAvlPacket(void *, int, char *);

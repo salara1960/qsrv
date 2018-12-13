@@ -35,7 +35,9 @@
 //char const *vers = "1.8";//04.12.2018 - edit error code case
 //char const *vers = "1.9";//06.12.2018 - fixed bug in parse command
 //char const *vers = "2.0";//10.12.2018 - minor changes : add database error codes
-char const *vers = "2.1";//12.12.2018 - minor changes : add gui effects
+//char const *vers = "2.1";//12.12.2018 - minor changes : add gui effects
+//char const *vers = "2.1.1";//12.12.2018 - minor changes : add gui effects
+char const *vers = "2.1.2";//13.12.2018 - minor changes : add background image in gui
 
 
 const QString title = "GPS device (Teltonika) server application";
@@ -1320,9 +1322,9 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
 {
     ui->setupUi(this);
     //this->setFixedSize(this->size());
-    ui->l_ignition->setVisible(false);
+    ui->l_ignition->setVisible(false);//hide ignition
 
-    this->setWindowOpacity(0.9);
+    this->setWindowOpacity(0.9);//set the level of transparency
 
     port = p;
     tcpServer = NULL;
@@ -1385,6 +1387,11 @@ MainWindow::~MainWindow()
     delete ui;
 }
 //--------------------------------------------------------------------------
+void MainWindow::PrnTextInfo(QString st)
+{
+    ui->textinfo->append(st);
+}
+//--------------------------------------------------------------------------
 void MainWindow::sql_err_msg(QSqlError &er)
 {
     if (er.type() == QSqlError::NoError) return;
@@ -1433,9 +1440,9 @@ bool ret = false;
             }
         } else {
             sql_err = query->lastError();
-            ui->textinfo->append("query->exec(" + req + ") - Error");
+            PrnTextInfo("query->exec(" + req + ") - Error");
         }
-    } else ui->textinfo->append("error open DB `" + *db_name + "`");
+    } else PrnTextInfo("error open DB `" + *db_name + "`");
 
 
     if (openok) {
@@ -1597,7 +1604,7 @@ void MainWindow::newuser()
             stx.append("New client '" + CliUrl + "' online, socket " + QString::number(fd, 10) + ", but client already present !\n");
             cliSocket->close();
         }
-        ui->textinfo->append(stx);
+        PrnTextInfo(stx);
         LogSave(__func__, stx, true);
     }
 }
@@ -1629,12 +1636,12 @@ QString stx;
                               thecar.imei + " | " +
                               thecar.sim  + " | " +
                               dev_type_name[thecar.type] + " (" + QString::number(thecar.type) + ")";
-                        ui->textinfo->append(stx);
+                        PrnTextInfo(stx);
                         statusBar()->clearMessage(); statusBar()->showMessage(stx);
                         LogSave(__func__, stx, true);
                     } else {
                         stx = "ClientDevID " + imei + " unknown.";
-                        ui->textinfo->append(stx);
+                        PrnTextInfo(stx);
                         statusBar()->clearMessage(); statusBar()->showMessage(stx);
                         LogSave(__func__, stx, true);
                         slotCliDone(cliSocket, 1);
@@ -1700,7 +1707,7 @@ void MainWindow::slotCliDone(QTcpSocket *cli, int prn)
     if (cli->isOpen()) {
         if (prn) {
                 QString stx = "Close client, socket " + QString::number(fd, 10) + ".\n";
-                ui->textinfo->append(stx);
+                PrnTextInfo(stx);
                 LogSave(__func__, stx, true);
                 statusBar()->clearMessage(); statusBar()->showMessage(stx);
         }
@@ -1720,7 +1727,7 @@ QTcpSocket *cliSocket = (QTcpSocket *)sender();
 QString qs = "Socket ERROR (" + QString::number((int)SErr, 10) + ") : " + cliSocket->errorString();
 
     QString stx = "Close client, socket " + QString::number(cliSocket->socketDescriptor(), 10) + ". " + qs + "\n";
-    ui->textinfo->append(stx);
+    PrnTextInfo(stx);
     LogSave(__func__, stx, true);
     statusBar()->clearMessage(); statusBar()->showMessage(stx);
 
@@ -1761,7 +1768,7 @@ void MainWindow::slotRdyPack(int ilen)
                     time_t ict = QDateTime::currentDateTime().toTime_t();
                     struct tm *ct = localtime(&ict);
                     QString dt; dt.sprintf("%02d:%02d:%02d  ", ct->tm_hour, ct->tm_min, ct->tm_sec);
-                    ui->textinfo->append(dt + qstx);
+                    PrnTextInfo(dt + qstx);
                     LogSave(NULL, qstx, 0);
                     codec_id = 0;
                 }
@@ -1789,7 +1796,7 @@ int dtype = thecar.type;
     if (dtype == DEV_FM1110) max_cmds = max_cmds0;
 
     if (client && stx.length() && (fd > 0)) {
-        ui->textinfo->append(stx);
+        PrnTextInfo(stx);
         LogSave(__func__, stx, 1);
 
         res = ParseResp(stx, cmd_par);
@@ -1919,7 +1926,7 @@ int dtype = thecar.type;
                         sprintf(st, "%02X", (uint8_t)to_cli[i]);
                         stx.append(st);
                 }
-                ui->textinfo->append(stx);
+                PrnTextInfo(stx);
                 LogSave(__func__, stx + "\n", 1);
             }
             QTcpSocket *cliS = SClients[fd];
