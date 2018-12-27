@@ -26,6 +26,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QListWidget>
 
 //********************************************************************************
 #define size_imei 15
@@ -41,6 +42,9 @@
 #define max_dev_type 5
 #define max_rows 4
 #define def_oc_time 2
+#define CodecID8 8
+#define CodecID12 12
+#define CodecID13 13
 //********************************************************************************
 
 typedef enum {
@@ -132,7 +136,6 @@ typedef struct
 } s_pins;
 #pragma pack(pop)
 
-#pragma pack(push,1)
 typedef struct
 {
     int index;
@@ -140,7 +143,6 @@ typedef struct
     QString sim;
     uint8_t type;
 } s_car;
-#pragma pack(pop)
 
 //********************************************************************************
 
@@ -179,12 +181,13 @@ public:
 
 public slots:
 
+    void PrnTextInfo(QString);
     void LogSave(const char *, QString, bool);
     uint16_t ks(uint8_t *, int);
     int MakeAvlPacket(void *, int, char *);
     char *ShowTime(time_t *, char *);
     char *io_name(uint8_t, char *, uint8_t);
-    int ParseResp(QString *, char *);
+    int ParseResp(QString, char *);
     int CalcFuel(uint16_t, uint8_t);
     QJsonObject *ConvertStrToJsonObject(char *, int *);
     int parse_data_from_dev(char *, int, QJsonObject *, int *);

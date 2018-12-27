@@ -30,13 +30,23 @@
 //char const *vers = "1.5.1";//28.11.2018
 //char const *vers = "1.5.2";//28.11.2018
 //char const *vers = "1.6";//29.11.2018
-char const *vers = "1.6.1";//29.11.2018
+//char const *vers = "1.6.1";//29.11.2018
+//char const *vers = "1.7";//02.12.2018
+//char const *vers = "1.8";//04.12.2018 - edit error code case
+//char const *vers = "1.9";//06.12.2018 - fixed bug in parse command
+//char const *vers = "2.0";//10.12.2018 - minor changes : add database error codes
+//char const *vers = "2.1";//12.12.2018 - minor changes : add gui effects
+//char const *vers = "2.1.1";//12.12.2018 - minor changes : add gui effects
+char const *vers = "2.1.2";//13.12.2018 - minor changes : add background image in gui
 
 
 const QString title = "GPS device (Teltonika) server application";
 const QString LogFileName = "logs.txt";
 uint8_t dbg = 2;
 const int time_wait_answer = 10000;//10 sec.
+
+int srv_port = 0;
+QString sdnm = "";
 
 char gradus = '^';
 const char *prio_name[] = {"Low","High","Panic","Security"};
@@ -180,9 +190,6 @@ const uint16_t crc16tab[] = // CRC lookup table [B]polynomial 0xA001[/B]
 };
 #define UPDC16(ch, crc) (crc16tab[((crc) ^ (ch)) & 0xff] ^ ((crc) >> 8))
 
-int srv_port = 0;
-QString sdnm = "";
-
 //-----------------------------------------------------------------------
 void parse_param_start(char *param)
 {
@@ -258,29 +265,28 @@ const char *cmu = NULL;
     if ((command_id < 0) || (command_id >= max_cm)) return ret;
 
     if (thecar.type > DEV_FM1110) {
-        if (command_id == 27) {//"lvcansetprog", //"setcanprog"  //27//LVCANSETPROG     //"lvcansetprog 112" | Yes//{"command":27}
+        if (command_id == 27) {// set can_prog
             if (thecar.type == DEV_FM5300) sprintf(cds, "setcanprog%s", par);//FM5300
                                       else sprintf(cds, "lvcansetprog%s", par);//FMB630
-        } else if (command_id == 22) {//"lvcangetprog", //"getcanprog"  //22//CAN Program Number request | Yes //{"command":22}
+        } else if (command_id == 22) {//get can_prog
             if (thecar.type == DEV_FM5300) sprintf(cds, "getcanprog");//FM5300
                                       else sprintf(cds, "lvcangetprog");//FMB630
         } else sprintf(cds,"%s%s\r\n", cmu, par);
     } else sprintf(cds,"%s%s\r\n", cmu, par);
 
+    len = strlen(cds);
 
     if (dbg > 2) {
         QString qcds; qcds.append(cds);
         LogSave(__func__, qcds + "\n", 1);
     }
 
-    len = strlen(cds);
-
     alen = sizeof(s_avl_cmd) + ((len + 5) * cnt) + 5;
 
     tmp = (uint8_t *)calloc(1, alen + 1);
     if (tmp) {
         hdr = (s_avl_cmd *)tmp;
-        hdr->codec_id = 0x0c;
+        hdr->codec_id = CodecID12;//0x0c;
         hdr->cmd_cnt = cnt;
         uk = tmp + sizeof(s_avl_cmd);//uk to command_type
         ct = 0;
@@ -325,7 +331,7 @@ char *MainWindow::ShowTime(time_t *ct, char *bf)
 char *MainWindow::io_name(uint8_t id, char *st, uint8_t dtype)
 {
 
-switch (dtype) {
+  switch (dtype) {
     case DEV_FM6320://3://FM6320
     case DEV_FMB630://2://FMB630
         switch (id) {
@@ -651,12 +657,12 @@ switch (dtype) {
                 default : sprintf(st,"%d",id);
         }
     break;
-}
+  }
 
 return st;
 }
 //----------------------------------------------------------------------------------------------------------------------------
-int MainWindow::ParseResp(QString *ack, char *out)
+int MainWindow::ParseResp(QString ack, char *out)
 {
 int ret = -1, param = -1, relay = -1, val = 0xffff0000;
 QJsonParseError err;
@@ -665,7 +671,7 @@ char tp[max_cmd_len] = {0};
 int arr_len = 0, ct = 0;
 
 
-    buf.append(*ack);
+    buf.append(ack);
     QJsonDocument jdoc= QJsonDocument::fromJson(buf , &err);
     if (err.error != QJsonParseError::NoError) {
         if (dbg) {
@@ -692,7 +698,8 @@ int arr_len = 0, ct = 0;
         if (tmp.isUndefined()) tmp = obj->value(srv_command_relay);//"relay";
         if (!tmp.isUndefined()) {
             if (tmp.isString()) {//is_string
-                sprintf(tp+strlen(tp)," %s", (char *)tmp.toString().data());
+                buf.clear(); buf.append(tmp.toString());
+                sprintf(tp+strlen(tp)," %s", buf.data());
             } else {//is_integer
                 param = tmp.toInt();
                 relay = param & 0xff;
@@ -702,7 +709,8 @@ int arr_len = 0, ct = 0;
                     if (tmp.isUndefined()) tmp = obj->value(srv_command_time);//"time";
                     if (!tmp.isUndefined()) {
                         if (tmp.isString()) {
-                            sprintf(tp+strlen(tp)," %s", (char *)tmp.toString().data());
+                            buf.clear(); buf.append(tmp.toString());
+                            sprintf(tp+strlen(tp)," %s", buf.data());
                         } else if (tmp.isDouble()) {
                             sprintf(tp+strlen(tp)," %f", tmp.toDouble());
                         } else if (tmp.isArray()) {
@@ -737,10 +745,9 @@ int arr_len = 0, ct = 0;
     return ret;
 }
 //----------------------------------------------------------------------------------------------------------------------------
-int MainWindow::CalcFuel(uint16_t mv, uint8_t ign)
+int MainWindow::CalcFuel(uint16_t adc, uint8_t ign)
 {
 int ret = -1;
-uint16_t adc = mv;
 
     if (ign) {
              if (adc <= 750) ret = 42;
@@ -982,14 +989,14 @@ QString qstx, qstz;
 
     if (dbg >= 2) {
         memset(sta, 0, sizeof(sta));
-        if (codec_id == 8) len = sizeof(s_hdr_pack_bin); else len = sizeof(s_hdr_bin_ack);
+        if (codec_id == CodecID8) len = sizeof(s_hdr_pack_bin); else len = sizeof(s_hdr_bin_ack);
         for (i = 0; i < len; i++) sprintf(sta+strlen(sta),"%02X", *(uk+i));
         sprintf(stx,"HDR(%d):%s\nCodecID:\t%d\t%x\nTotalPackets:\t%d\t%x\n",
                         len,
                         sta,
                         h_bin->codec_id, h_bin->codec_id,
                         h_bin->numbers_pack, h_bin->numbers_pack);
-        if ((codec_id == 12) || (codec_id == 13)) sprintf(stx+strlen(stx),"PacketType:\t%d\n", h_bin_ack->type);
+        if ((codec_id == CodecID12) || (codec_id == CodecID13)) sprintf(stx+strlen(stx),"PacketType:\t%d\n", h_bin_ack->type);
         qstx.clear(); qstx.append(stx);
         LogSave(NULL, qstx, 0);
     }
@@ -999,12 +1006,12 @@ QString qstx, qstz;
     jarr = new QJsonArray();
 
     /*---------------------------------------------------------------------------------------*/
-    if ((codec_id == 12) || (codec_id == 13)) {//answer for command
+    if ((codec_id == CodecID12) || (codec_id == CodecID13)) {//answer for command
         if (dbg >= 2) LogSave(NULL, "DATA:\n", 0);
         n_cnt = 0; i = 0;
         len = ntohl(h_bin_ack->len);
         uk += sizeof(s_hdr_bin_ack);
-        if (codec_id == 13) {
+        if (codec_id == CodecID13) {
             memcpy(&dword, uk, 4);
             dword = ntohl(dword);
             uk += 4; len -= 4;
@@ -1039,7 +1046,7 @@ QString qstx, qstz;
         }
 
         if (jarr) {
-            if (codec_id == 13) js->insert("TimeStamp", QJsonValue((qint32)dword));
+            if (codec_id == CodecID13) js->insert("TimeStamp", QJsonValue((qint32)dword));
             js->insert("DATA", QJsonValue(*jarr));
             js->insert("Status", QJsonValue(i));
             delete jarr; jarr = NULL;
@@ -1308,17 +1315,21 @@ QString qstx, qstz;
 
 //----------------------------------------------------------------------------------------------------------------------------
 
-MainWindow::TheError::TheError(int err) { code = err; }
+MainWindow::TheError::TheError(int err) { code = err; }//error class descriptor
 
 //----------------------------------------------------------------------------------------------------------------------------
 MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
     //this->setFixedSize(this->size());
-    ui->l_ignition->setVisible(false);
+    ui->l_ignition->setVisible(false);//hide ignition
+
+    this->setWindowOpacity(0.9);//set the level of transparency
 
     port = p;
     tcpServer = NULL;
+    query = NULL;
+    db = NULL;
     MyError = 0;
     client = auth = false;
     imei.clear(); CliUrl.clear();
@@ -1335,16 +1346,27 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     movie = new QMovie(car);
     ui->avto->setMovie(movie);
 
-    thecar = {0,"","",0};
+    thecar = {0, "", "", 0};
     db_name = dnm;  
     sql_err.setType(QSqlError::NoError);
-
     query = NULL;
     openok = good = false;
     db = new QSqlDatabase(QSqlDatabase::addDatabase("QSQLITE"));
+    if (!db) {
+        MyError |= 0x10;//create database object error
+        throw TheError(MyError);
+    }
     db->setDatabaseName(*db_name);
     openok = db->open();
+    if (!openok) {
+        MyError |= 0x20;//open database error
+        throw TheError(MyError);
+    }
     query = new QSqlQuery(*db);
+    if (!query) {
+        MyError |= 0x40;//create query object error
+        throw TheError(MyError);
+    }
 
 }
 //-----------------------------------------------------------------------
@@ -1363,6 +1385,11 @@ MainWindow::~MainWindow()
     this->disconnect();
     delete movie;
     delete ui;
+}
+//--------------------------------------------------------------------------
+void MainWindow::PrnTextInfo(QString st)
+{
+    ui->textinfo->append(st);
 }
 //--------------------------------------------------------------------------
 void MainWindow::sql_err_msg(QSqlError &er)
@@ -1384,7 +1411,7 @@ bool ret = false;
         sql_err.setType(QSqlError::NoError);
         QString req = "SELECT * FROM `cars` order by `index`;";
         if (query->exec(req)) {
-            s_car tmp = {0,"","",0};
+            s_car tmp = {0, "", "", 0};
             int ix = 0; bool ok;
             while (query->next()) {
                 ix++;
@@ -1413,9 +1440,9 @@ bool ret = false;
             }
         } else {
             sql_err = query->lastError();
-            ui->textinfo->append("query->exec(" + req + ") - Error");
+            PrnTextInfo("query->exec(" + req + ") - Error");
         }
-    } else ui->textinfo->append("error open DB `" + *db_name + "`");
+    } else PrnTextInfo("error open DB `" + *db_name + "`");
 
 
     if (openok) {
@@ -1462,15 +1489,15 @@ void MainWindow::ShowHideData(bool flg)
         ui->avto->setVisible(false);
         movie->stop();
     }
-    ui->l_imei->setEnabled(flg); ui->imei->setEnabled(flg);
+    ui->l_imei->setEnabled(flg);     ui->imei->setEnabled(flg);
     ui->l_dev_name->setEnabled(flg); ui->dev_name->setEnabled(flg);
-    ui->l_cmd->setEnabled(flg); ui->cmd->setEnabled(flg);
-    ui->latitude->setEnabled(flg); ui->label->setEnabled(flg);
-    ui->longitude->setEnabled(flg); ui->label_2->setEnabled(flg);
-    ui->altitude->setEnabled(flg); ui->label_3->setEnabled(flg);
-    ui->angle->setEnabled(flg); ui->label_4->setEnabled(flg);
-    ui->sat->setEnabled(flg); ui->label_5->setEnabled(flg);
-    ui->speed->setEnabled(flg); ui->label_6->setEnabled(flg);
+    ui->l_cmd->setEnabled(flg);      ui->cmd->setEnabled(flg);
+    ui->latitude->setEnabled(flg);   ui->label->setEnabled(flg);
+    ui->longitude->setEnabled(flg);  ui->label_2->setEnabled(flg);
+    ui->altitude->setEnabled(flg);   ui->label_3->setEnabled(flg);
+    ui->angle->setEnabled(flg);      ui->label_4->setEnabled(flg);
+    ui->sat->setEnabled(flg);        ui->label_5->setEnabled(flg);
+    ui->speed->setEnabled(flg);      ui->label_6->setEnabled(flg);
     ui->din1->setEnabled(flg);
     ui->din2->setEnabled(flg);
     ui->din3->setEnabled(flg);
@@ -1479,9 +1506,9 @@ void MainWindow::ShowHideData(bool flg)
     ui->dout2->setEnabled(flg);
     ui->dout3->setEnabled(flg);
     ui->dout4->setEnabled(flg);
-    ui->ain1->setEnabled(flg); ui->l_ain1->setEnabled(flg);
-    ui->ain2->setEnabled(flg); ui->l_ain2->setEnabled(flg);
-    ui->ain3->setEnabled(flg); ui->l_ain3->setEnabled(flg);
+    ui->ain1->setEnabled(flg);       ui->l_ain1->setEnabled(flg);
+    ui->ain2->setEnabled(flg);       ui->l_ain2->setEnabled(flg);
+    ui->ain3->setEnabled(flg);       ui->l_ain3->setEnabled(flg);
 }
 //-----------------------------------------------------------------------
 void MainWindow::clearParam(int len)
@@ -1570,14 +1597,14 @@ void MainWindow::newuser()
             ui->sending->setEnabled(true);
             memset((uint8_t *)&pins, 0, sizeof(s_pins));
             thecar.index = 0;
-            thecar.imei = "";
-            thecar.sim = "";
-            thecar.type = 0;
+            thecar.imei  = "";
+            thecar.sim   = "";
+            thecar.type  = 0;
         } else {
             stx.append("New client '" + CliUrl + "' online, socket " + QString::number(fd, 10) + ", but client already present !\n");
             cliSocket->close();
         }
-        ui->textinfo->append(stx);
+        PrnTextInfo(stx);
         LogSave(__func__, stx, true);
     }
 }
@@ -1609,12 +1636,12 @@ QString stx;
                               thecar.imei + " | " +
                               thecar.sim  + " | " +
                               dev_type_name[thecar.type] + " (" + QString::number(thecar.type) + ")";
-                        ui->textinfo->append(stx);
+                        PrnTextInfo(stx);
                         statusBar()->clearMessage(); statusBar()->showMessage(stx);
                         LogSave(__func__, stx, true);
                     } else {
                         stx = "ClientDevID " + imei + " unknown.";
-                        ui->textinfo->append(stx);
+                        PrnTextInfo(stx);
                         statusBar()->clearMessage(); statusBar()->showMessage(stx);
                         LogSave(__func__, stx, true);
                         slotCliDone(cliSocket, 1);
@@ -1624,7 +1651,7 @@ QString stx;
                 }
             }
         break;
-        case 1://wait header pack from device
+        case 1://wait header of packet from device
             if (auth) {
                 dl = cliSocket->read(from_cli + lenrecv, rxdata - lenrecv);
                 lenrecv += dl;
@@ -1633,12 +1660,12 @@ QString stx;
                     rxdata = ntohl(hdr->len) + 4;
                     if (rxdata > max_buf) {
                         rxdata = max_buf;
-                        MyError |= 0x10;//avl_pack len > max_buf
+                        MyError |= 4;//avl_pack len > max_buf
                     }
                     lenrecv = 0; memset(from_cli, 0, sizeof(from_cli));
                     rdy = true;
                 }
-            } else MyError |= 4;//auth OFF
+            } else MyError |= 2;//auth OFF
         break;
     }
 
@@ -1649,8 +1676,8 @@ QString stx;
             codec_id = from_cli[0];
             cnt_pack = from_cli[1];
             switch (codec_id) {
-                case 8: total_pack++; break;
-                case 12: case 13: total_cmd++; break;
+                case CodecID8: total_pack++; break;
+                case CodecID12: case CodecID13: total_cmd++; break;
             }
             uint16_t ks_in = *(uint16_t *)(from_cli + lenrecv - 2); ks_in = ntohs(ks_in);
             uint16_t ks_calc = ks((uint8_t *)from_cli, lenrecv - 4);
@@ -1680,7 +1707,7 @@ void MainWindow::slotCliDone(QTcpSocket *cli, int prn)
     if (cli->isOpen()) {
         if (prn) {
                 QString stx = "Close client, socket " + QString::number(fd, 10) + ".\n";
-                ui->textinfo->append(stx);
+                PrnTextInfo(stx);
                 LogSave(__func__, stx, true);
                 statusBar()->clearMessage(); statusBar()->showMessage(stx);
         }
@@ -1700,7 +1727,7 @@ QTcpSocket *cliSocket = (QTcpSocket *)sender();
 QString qs = "Socket ERROR (" + QString::number((int)SErr, 10) + ") : " + cliSocket->errorString();
 
     QString stx = "Close client, socket " + QString::number(cliSocket->socketDescriptor(), 10) + ". " + qs + "\n";
-    ui->textinfo->append(stx);
+    PrnTextInfo(stx);
     LogSave(__func__, stx, true);
     statusBar()->clearMessage(); statusBar()->showMessage(stx);
 
@@ -1719,12 +1746,12 @@ void MainWindow::slotRdyPack(int ilen)
             jobj->insert("ServerTime",QJsonValue((qint32)time(NULL)));
             jobj->insert("FromAddr", QJsonValue(CliUrl));
             switch (codec_id) {
-                case 8:
+                case CodecID8:
                     seq_number++;
                     jobj->insert("SeqNumber", QJsonValue(seq_number));
                 break;
-                case 12:
-                case 13:
+                case CodecID12:
+                case CodecID13:
                     cmd_seq_number++;
                     jobj->insert("SeqNumber",QJsonValue(cmd_seq_number));
                     jobj->insert("Command", QJsonValue(cmd_id));
@@ -1741,7 +1768,7 @@ void MainWindow::slotRdyPack(int ilen)
                     time_t ict = QDateTime::currentDateTime().toTime_t();
                     struct tm *ct = localtime(&ict);
                     QString dt; dt.sprintf("%02d:%02d:%02d  ", ct->tm_hour, ct->tm_min, ct->tm_sec);
-                    ui->textinfo->append(dt + qstx);
+                    PrnTextInfo(dt + qstx);
                     LogSave(NULL, qstx, 0);
                     codec_id = 0;
                 }
@@ -1769,10 +1796,10 @@ int dtype = thecar.type;
     if (dtype == DEV_FM1110) max_cmds = max_cmds0;
 
     if (client && stx.length() && (fd > 0)) {
-        ui->textinfo->append(stx);
+        PrnTextInfo(stx);
         LogSave(__func__, stx, 1);
 
-        res = ParseResp(&stx, cmd_par);
+        res = ParseResp(stx, cmd_par);
         relz = (res >> 8) & 0xff;
         timz = res >> 16;
         res &= 0xff;
@@ -1786,18 +1813,18 @@ int dtype = thecar.type;
                             sprintf(cmd_par, " ");
                             for (i = 0; i < 4; i++) {
                                 if ((relz - 1) == i) chab = '1'; else chab = 'X';
-                                sprintf(cmd_par+strlen(cmd_par),"%c", chab);
+                                sprintf(cmd_par+strlen(cmd_par), "%c", chab);
                             }
                             if (timz > 0) {
                                 for (i = 0; i < 4; i++) {
-                                    if ((relz - 1) == i) sprintf(cmd_par+strlen(cmd_par)," %d", timz);
-                                                    else sprintf(cmd_par+strlen(cmd_par)," 0");
+                                    if ((relz - 1) == i) sprintf(cmd_par+strlen(cmd_par), " %d", timz);
+                                                    else sprintf(cmd_par+strlen(cmd_par), " 0");
                                 }
                             } else sprintf(cmd_par+strlen(cmd_par)," 0 0 0 0");
                         }
                     } else {
-                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par," %d 0", oc_time);//FM1110//"setdigout Dt 0"
-                                                    else sprintf(cmd_par," %d 0", relz);//FM1110//"setdigout 10 T 0"
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " %d 0", oc_time);//FM1110//"setdigout Dt 0"
+                                                    else sprintf(cmd_par, " %d 0", relz);//FM1110//"setdigout 10 T 0"
                     }
                 break;
                 case 2://SET OFF DOUT
@@ -1806,7 +1833,7 @@ int dtype = thecar.type;
                             sprintf(cmd_par, " ");
                             for (i = 0; i < 4; i++) {
                                 if ((relz - 1) == i) chab = '0'; else chab = 'X';
-                                sprintf(cmd_par+strlen(cmd_par),"%c", chab);
+                                sprintf(cmd_par+strlen(cmd_par), "%c", chab);
                             }
                             sprintf(cmd_par+strlen(cmd_par)," 0 0 0 0");
                         }
@@ -1818,8 +1845,8 @@ int dtype = thecar.type;
                                     else cid = 34;//"SET_OFF 1 0"
                         sprintf(cmd_par, " 1 0");
                     } else {
-                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par," 0 %d", oc_time);//FM1110
-                                                    else sprintf(cmd_par," 0 %d", relz);//FM1110
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " 0 %d", oc_time);//FM1110
+                                                    else sprintf(cmd_par, " 0 %d", relz);//FM1110
                     }
                 break;
                 case 4:
@@ -1834,8 +1861,8 @@ int dtype = thecar.type;
                         cid = 33;
                         sprintf(cmd_par, " 2 2");//"SET_ON 2 2"
                     } else {
-                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par," %d %d", oc_time, oc_time);//FM1110//"setdigout Dt 0"
-                                                    else sprintf(cmd_par," %d %d", relz, relz);//FM1110//"setdigout 10 T 0"
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " %d %d", oc_time, oc_time);//FM1110//"setdigout Dt 0"
+                                                    else sprintf(cmd_par, " %d %d", relz, relz);//FM1110//"setdigout 10 T 0"
                     }
                 break;
                 case 6:
@@ -1888,6 +1915,7 @@ int dtype = thecar.type;
                 case 48://"SET_ALL X1,Y1 X2,Y2 X3,Y3 X4,Y4 X5,Y5 X6,Y6 X7,Y7 X8,Y8"
                 break;
             }//switch(cmd_id)
+
             memset(to_cli, 0, sizeof(to_cli));
             result = MakeAvlPacket((uint8_t *)to_cli, cid, cmd_par);
         } else result = -1;
@@ -1898,7 +1926,7 @@ int dtype = thecar.type;
                         sprintf(st, "%02X", (uint8_t)to_cli[i]);
                         stx.append(st);
                 }
-                ui->textinfo->append(stx);
+                PrnTextInfo(stx);
                 LogSave(__func__, stx + "\n", 1);
             }
             QTcpSocket *cliS = SClients[fd];
@@ -1906,7 +1934,7 @@ int dtype = thecar.type;
             dev_wait_answer = 1;
             tmr_ack = startTimer(time_wait_answer);//wait ack from device until 10 sec
             if (tmr_ack <= 0) {
-                MyError |= 0x20;//start_timer error
+                MyError |= 8;//start_timer error
                 throw TheError(MyError);
             }
             ui->sending->setEnabled(false);//block send button
