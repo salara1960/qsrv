@@ -15,7 +15,7 @@ QString dnm("cars.s3db");
 
     try {
         QApplication srv(argc, argv);
-        MainWindow wnd(NULL, port, &dnm);
+        MainWindow wnd(nullptr, port, &dnm);
         wnd.show();
         srv.exec();
     }

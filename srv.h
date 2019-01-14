@@ -8,6 +8,7 @@
 #include <endian.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <QApplication>
 #include <QMainWindow>
 #include <QtNetwork>
@@ -27,6 +28,9 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QListWidget>
+
+#include <QtQuickWidgets/QQuickWidget>
+#include <QQmlApplicationEngine>
 
 //********************************************************************************
 #define size_imei 15
@@ -148,6 +152,20 @@ typedef struct
 
 extern int srv_port;
 extern QString sdnm;
+extern char const *vers;
+extern uint8_t dbg;
+extern char gradus;
+extern const char *prio_name[];
+extern const char *unknown;
+extern const char *lat_name[];     // широта Latitude
+extern const char *lon_name[];       // долгота Longitude
+extern const char *net_type_name[];
+
+extern const char *form;
+extern QString dev_type_name[];
+extern const char *mk_table;
+extern const char *cmds0[];
+extern const char *cmds1[];
 
 extern void parse_param_start(char *param);
 
@@ -175,7 +193,7 @@ public:
             TheError(int);
     };
 
-    explicit MainWindow(QWidget *parent = 0, int p = 9090, QString *dnm = 0);
+    explicit MainWindow(QWidget *parent = nullptr, int p = 9090, QString *dnm = nullptr);
     ~MainWindow();
     void timerEvent(QTimerEvent *event);
 
@@ -209,6 +227,7 @@ private slots:
 
     bool check_dev(s_car *car);
     void sql_err_msg(QSqlError &er);
+    void MkMap();
 
 signals:
 
@@ -216,6 +235,7 @@ signals:
     void sigRdyPack(int);
     void sigSending();
     void sigWaitDone();
+    void sigMkMap();
 
 private:
 
@@ -238,6 +258,9 @@ private:
     bool openok, good;
     QSqlError sql_err;
     s_car thecar;
+    QQmlApplicationEngine *eng;
+    QQuickWidget *wid;
+
 };
 
 #endif // SRV_H

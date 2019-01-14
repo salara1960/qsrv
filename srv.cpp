@@ -37,7 +37,10 @@
 //char const *vers = "2.0";//10.12.2018 - minor changes : add database error codes
 //char const *vers = "2.1";//12.12.2018 - minor changes : add gui effects
 //char const *vers = "2.1.1";//12.12.2018 - minor changes : add gui effects
-char const *vers = "2.1.2";//13.12.2018 - minor changes : add background image in gui
+//char const *vers = "2.1.2";//13.12.2018 - minor changes : add background image in gui
+//char const *vers = "3.0";//27.12.2018 - major changes : add qquickwidget for map
+char const *vers = "3.1";//14.01.2019 - major changes : make map without qml
+
 
 
 const QString title = "GPS device (Teltonika) server application";
@@ -193,7 +196,7 @@ const uint16_t crc16tab[] = // CRC lookup table [B]polynomial 0xA001[/B]
 //-----------------------------------------------------------------------
 void parse_param_start(char *param)
 {
-char *uk = NULL;
+char *uk = nullptr;
 
     uk = strstr(param, "port=");
     if (uk) {
@@ -233,11 +236,12 @@ void MainWindow::LogSave(const char *func, QString st, bool pr)
 uint16_t MainWindow::ks(uint8_t *uk, int len)
 {
 uint16_t crc16 = 0, word;
-int i;
+int i = 0;
 
-    for (i = 0; i < len; i++) {
-        word = *(uint16_t *)(uk + i);
+    while (i < len) {
+        memcpy(&word, uk + i, sizeof(uint16_t));
         crc16 = UPDC16(word, crc16);
+        i++;
     }
 
     return crc16;
@@ -246,13 +250,13 @@ int i;
 int MainWindow::MakeAvlPacket(void *buf, int command_id, char *par)
 {
 int ret = -1;
-uint8_t *uk = NULL, *tmp = NULL, *tp = NULL;
+uint8_t *uk = nullptr, *tmp = nullptr, *tp = nullptr;
 uint8_t cnt = 0x01, ct, type = 5, max_cm;
 uint32_t alen, len;
 uint32_t tlen, crc = 0, dl = 0, cmd_len = 0;
-s_avl_cmd *hdr = NULL;
+s_avl_cmd *hdr = nullptr;
 char cds[max_cmd_len] = {0};
-const char *cmu = NULL;
+const char *cmu = nullptr;
 
     if (thecar.type == DEV_FM1110) {
         max_cm = max_cmds0;
@@ -274,7 +278,7 @@ const char *cmu = NULL;
         } else sprintf(cds,"%s%s\r\n", cmu, par);
     } else sprintf(cds,"%s%s\r\n", cmu, par);
 
-    len = strlen(cds);
+    len = strlen(cds) & 0xffffffff;
 
     if (dbg > 2) {
         QString qcds; qcds.append(cds);
@@ -295,7 +299,7 @@ const char *cmu = NULL;
             dl = len;
             cmd_len = htonl(dl);
             memcpy(uk, &cmd_len, 4); uk += 4;
-            memcpy(uk, (uint8_t *)cds, dl); uk += dl;
+            memcpy(uk, &cds, dl); uk += dl;
             ct++;
         }
         *uk = cnt;
@@ -664,7 +668,7 @@ return st;
 //----------------------------------------------------------------------------------------------------------------------------
 int MainWindow::ParseResp(QString ack, char *out)
 {
-int ret = -1, param = -1, relay = -1, val = 0xffff0000;
+int ret = -1, param = -1, relay = -1, val = -65536;//0xffff0000;
 QJsonParseError err;
 QByteArray buf;
 char tp[max_cmd_len] = {0};
@@ -803,8 +807,8 @@ const int max_str = 256;
 int dl = 0, cmd = *kda, loop = 1, cnt = 0;
 char tp[max_str], val[max_str];
 uint8_t err = 0, up = 0;
-QJsonObject *ret = NULL;
-char *uki = NULL, *uks = NULL, *uke = NULL, *ukend = NULL;
+QJsonObject *ret = nullptr;
+char *uki = nullptr, *uks = nullptr, *uke = nullptr, *ukend = nullptr;
 
 
     if (!st) return ret;
@@ -849,7 +853,7 @@ char *uki = NULL, *uks = NULL, *uke = NULL, *ukend = NULL;
                     }
                     uks = uke + 1;
                     uke = strchr(uks,' ');
-                    if (uke == NULL) uke = strchr(uks,'\0');
+                    if (!uke) uke = strchr(uks,'\0');
                     if (uke) {
                         memset(val, 0, sizeof(val));
                         dl = uke - uks; if (dl >= max_str) dl = max_str - 1;
@@ -900,7 +904,7 @@ char *uki = NULL, *uks = NULL, *uke = NULL, *ukend = NULL;
 
     if ((err) && (ret)) {
         delete ret;
-        ret = NULL;
+        ret = nullptr;
     }
 
     if (!err && ret) {
@@ -934,15 +938,15 @@ int MainWindow::parse_data_from_dev(char *lin, int dline, QJsonObject *js, int *
 int ret = 0, el_dl;
 char stx[max_tmp_len] = {0};
 char sta[max_tmp_len] = {0};
-uint8_t *st = NULL;
-char *stm = NULL;
-s_hdr_pack_bin *h_bin = NULL;
-s_pack_bin *p_bin = NULL;
-s_gps_pack_bin *g_bin = NULL;
-s_hdr_bin_ack *h_bin_ack = NULL;
+uint8_t *st = nullptr;
+char *stm = nullptr;
+s_hdr_pack_bin *h_bin = nullptr;
+s_pack_bin *p_bin = nullptr;
+s_gps_pack_bin *g_bin = nullptr;
+s_hdr_bin_ack *h_bin_ack = nullptr;
 float lat, lon;
 int intm, delitel, more = 0, len = 0, i;
-uint8_t *_end = NULL, *uk = NULL;
+uint8_t *_end = nullptr, *uk = nullptr;
 const char *ptr;
 char stz[64] = {0};
 time_t tim;
@@ -952,17 +956,17 @@ uint8_t byte;
 uint16_t word;
 uint64_t dint8;
 float latit, longit, rdat;
-QJsonObject *jpack = NULL, *jarr_io = NULL, *jans = NULL, *jsta = NULL;
-QJsonArray *jarr = NULL;
+QJsonObject *jpack = nullptr, *jarr_io = nullptr, *jans = nullptr, *jsta = nullptr;
+QJsonArray *jarr = nullptr;
 uint8_t ign = 0, door = 1, trunk = 1, skp = 1, hood = 0, tah = 0;
 uint16_t fuel = 0;
 short temp_pcb;
-char *uki = NULL;
+char *uki = nullptr;
 QString qstx, qstz;
 
 
 
-    if ((dline < (int)sizeof(s_hdr_pack_bin)) || (dline >= buf_size) || !js) {
+    if ((dline < (int)sizeof(s_hdr_pack_bin)) || (dline >= (int)buf_size) || (js == nullptr)) {
         qstx.sprintf("Parse AVL error or ack for command -> len=%d\n", dline);
         LogSave(__func__, qstx, 1);
         return -1;
@@ -998,7 +1002,7 @@ QString qstx, qstz;
                         h_bin->numbers_pack, h_bin->numbers_pack);
         if ((codec_id == CodecID12) || (codec_id == CodecID13)) sprintf(stx+strlen(stx),"PacketType:\t%d\n", h_bin_ack->type);
         qstx.clear(); qstx.append(stx);
-        LogSave(NULL, qstx, 0);
+        LogSave(nullptr, qstx, 0);
     }
 
     js->insert("CodecID",  QJsonValue(h_bin->codec_id));
@@ -1007,7 +1011,7 @@ QString qstx, qstz;
 
     /*---------------------------------------------------------------------------------------*/
     if ((codec_id == CodecID12) || (codec_id == CodecID13)) {//answer for command
-        if (dbg >= 2) LogSave(NULL, "DATA:\n", 0);
+        if (dbg >= 2) LogSave(nullptr, "DATA:\n", 0);
         n_cnt = 0; i = 0;
         len = ntohl(h_bin_ack->len);
         uk += sizeof(s_hdr_bin_ack);
@@ -1018,14 +1022,14 @@ QString qstx, qstz;
         }
         while (n_cnt < h_bin_ack->numbers_pack) {
             n_cnt++;
-            stm = (char *)calloc(1, len+1);
+            stm = (char *)calloc(1, len + 1);
             if (stm) {
                 memcpy(stm, uk, len);
                 if ((strstr(stm,"Error")) || (strstr(stm,"ERROR"))) i = 1;
                 jans = ConvertStrToJsonObject(stm, kom);
                 if (jans) {
                     jarr->append(*jans);
-                    delete jans; jans = NULL;
+                    delete jans; jans = nullptr;
                 } else {
                     uki = strstr(stm, "\r\n"); if (uki) { if (uki != stm) *uki = '\0'; }
                     jarr->append(QJsonValue(stm));
@@ -1034,14 +1038,14 @@ QString qstx, qstz;
                     memset(sta, 0, sizeof(sta));
                     sprintf(sta,"[%d]:", len);
                     qstx.clear(); qstx.append(sta);
-                    LogSave(NULL, qstx + "\n", 0);
+                    LogSave(nullptr, qstx + "\n", 0);
                 }
                 if (n_cnt < h_bin_ack->numbers_pack) {
                     uk += len;
                     memcpy(&len, uk, sizeof(uint32_t));//get len for next pack
                     len = ntohl(len);
                 }
-                free(stm); stm = NULL;
+                free(stm); stm = nullptr;
             }
         }
 
@@ -1049,7 +1053,7 @@ QString qstx, qstz;
             if (codec_id == CodecID13) js->insert("TimeStamp", QJsonValue((qint32)dword));
             js->insert("DATA", QJsonValue(*jarr));
             js->insert("Status", QJsonValue(i));
-            delete jarr; jarr = NULL;
+            delete jarr; jarr = nullptr;
         }
         if (st) free(st);
         if (g_bin) free(g_bin);
@@ -1085,7 +1089,7 @@ QString qstx, qstz;
                         p_bin->prio,
                         ptr);
                 qstx.clear(); qstx.append(stx);
-                LogSave(NULL, qstx, 0);
+                LogSave(nullptr, qstx, 0);
             }
             jpack = new QJsonObject();
             jpack->insert("TimeStamp", QJsonValue((qint32)tim));
@@ -1133,7 +1137,7 @@ QString qstx, qstz;
                              g_bin->sattelites,
                              g_bin->speed);
                 qstx.clear(); qstx.append(stx);
-                LogSave(NULL, qstx, 0);
+                LogSave(nullptr, qstx, 0);
             }
             jpack->insert("Latitude",  QJsonValue(latit));
             jpack->insert("Longitude", QJsonValue(longit));
@@ -1152,7 +1156,7 @@ QString qstx, qstz;
             if (dbg >= 2) {
                 sprintf(stx, "IO: (ID_event:\t%u, Total_elem:\t%u)\n", p_bin->id_event, p_bin->total_elem);
                 qstx.clear(); qstx.append(stx);
-                LogSave(NULL, qstx, 0);
+                LogSave(nullptr, qstx, 0);
             }
 
             jpack->insert("EventID",      QJsonValue(p_bin->id_event));
@@ -1211,19 +1215,19 @@ QString qstx, qstz;
                         break;
                         case 2:
                             memcpy(&word, uk, el_dl);
-                            dint8 = (uint16_t)htons(word);
+                            dint8 = htons(word) & 0xffff;
                             switch (cmd_id) {
                                 case 9://AIN1 - fuel (ДУТ)
-                                    fuel = dint8;
-                                    pins.ain1 = (uint16_t)dint8;
+                                    fuel = dint8 & 0xffff;
+                                    pins.ain1 = dint8 & 0xffff;
                                 break;
                                 case 10://AIN2 - tach (Тахометр)
-                                    pins.ain2 = (uint16_t)dint8;
+                                    pins.ain2 = dint8 & 0xffff;
                                     if (dint8 > 1000) tah = 1;//двигатель заведен
                                                  else tah = 0;//двигатель заглушен
                                 break;
                                 case 11://AIN3 - hood (Капот)
-                                    pins.ain3 = (uint16_t)dint8;
+                                    pins.ain3 = dint8 & 0xffff;
                                     if (dint8 < 1000) hood = 1;//открыт
                                                  else hood = 0;//закрыт
                                 break;
@@ -1247,7 +1251,7 @@ QString qstx, qstz;
                             if (dbg >= 2) sprintf(stx+strlen(stx),"\t[%u]:\tio(%03u)=%" PRIu64 "\t'%s'\t(%s)\n", ind + 1, cmd_id, dint8, stz, net_type_name[dint8&1]);
                         break;
                         case 70: //"PCBTemp"
-                            temp_pcb = dint8; rdat = temp_pcb; rdat /= 10.0; rdat = round(rdat * 10.0); rdat /= 10.0;
+                            temp_pcb = (short)dint8; rdat = temp_pcb; rdat /= 10.0; rdat = round(rdat * 10.0); rdat /= 10.0;
                             jarr_io->insert(qstz, QJsonValue(rdat));
                             if (dbg >= 2) sprintf(stx+strlen(stx),"\t[%u]:\tio(%03u)=%" PRIu64 "\t'%s'\t(%.1f%c)\n", ind + 1, cmd_id, dint8, stz, rdat, gradus);
                         break;
@@ -1269,16 +1273,16 @@ QString qstx, qstz;
                 el_dl <<= 1;
                 if (dbg >= 2) {
                     qstx.clear(); qstx.append(stx);
-                    LogSave(NULL, qstx, 0);
+                    LogSave(nullptr, qstx, 0);
                 }
                 if (uk >= _end) break;
             }
 
             //UpdatePins();
 
-            if (dbg >= 2) LogSave(NULL, "\n", 0);
+            if (dbg >= 2) LogSave(nullptr, "\n", 0);
             //--------------------   ADD STAT FLAGS   -----------------------------
-            if (jsta) { delete jsta; jsta = NULL; }
+            if (jsta) { delete jsta; jsta = nullptr; }
             jsta = new QJsonObject();
             jsta->insert("Door",       QJsonValue(door));
             jsta->insert("Ignition",   QJsonValue(ign));
@@ -1290,12 +1294,12 @@ QString qstx, qstz;
             if (jarr_io) {
                 jarr_io->insert("Stat", QJsonValue(*jsta));
                 jpack->insert("ELEMENTS", QJsonValue(*jarr_io));
-                delete jarr_io; jarr_io = NULL;
+                delete jarr_io; jarr_io = nullptr;
             }
-            delete jsta; jsta = NULL;
+            delete jsta; jsta = nullptr;
             if (jpack) {
                 jarr->append(*jpack);
-                delete jpack; jpack = NULL;
+                delete jpack; jpack = nullptr;
             }
             if (uk >= _end) break;
         } else break;
@@ -1305,7 +1309,7 @@ QString qstx, qstz;
     UpdatePins();
 
     js->insert("PACKETS", QJsonValue(*jarr));
-    delete jarr; jarr = NULL;
+    delete jarr; jarr = nullptr;
 
     if (st) free(st);
     if (g_bin) free(g_bin);
@@ -1327,9 +1331,9 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     this->setWindowOpacity(0.9);//set the level of transparency
 
     port = p;
-    tcpServer = NULL;
-    query = NULL;
-    db = NULL;
+    tcpServer = nullptr;
+    query = nullptr;
+    db = nullptr;
     MyError = 0;
     client = auth = false;
     imei.clear(); CliUrl.clear();
@@ -1340,7 +1344,7 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     total_pack = total_cmd = 0;
     setWindowTitle(title + " ver. " + vers);
     ui->sending->setEnabled(false);
-    memset((uint8_t *)&pins, 0, sizeof(s_pins));
+    memset(&pins, 0, sizeof(s_pins));
     tmr_sec = startTimer(1000);// 1 sec.
 
     movie = new QMovie(car);
@@ -1349,7 +1353,7 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     thecar = {0, "", "", 0};
     db_name = dnm;  
     sql_err.setType(QSqlError::NoError);
-    query = NULL;
+    query = nullptr;
     openok = good = false;
     db = new QSqlDatabase(QSqlDatabase::addDatabase("QSQLITE"));
     if (!db) {
@@ -1368,10 +1372,18 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
         throw TheError(MyError);
     }
 
+    wid = new QQuickWidget(QUrl(QStringLiteral("qrc:/srv.qml")), ui->qWidget);
+    eng = nullptr;
+    connect(this, SIGNAL(sigMkMap()), this, SLOT(MkMap()));
+    emit sigMkMap();
+
 }
 //-----------------------------------------------------------------------
 MainWindow::~MainWindow()
 {
+    if (eng) delete eng;
+    if (wid) delete wid;
+
     if (query) {
         query->clear();
         delete query;
@@ -1385,6 +1397,14 @@ MainWindow::~MainWindow()
     this->disconnect();
     delete movie;
     delete ui;
+}
+//--------------------------------------------------------------------------
+void MainWindow::MkMap()
+{
+    if (wid) {
+        if (eng) { delete eng; eng = nullptr; }
+        eng = new QQmlApplicationEngine(wid);
+    }
 }
 //--------------------------------------------------------------------------
 void MainWindow::PrnTextInfo(QString st)
@@ -1418,7 +1438,7 @@ bool ret = false;
                 tmp.index = query->value(0).toString().toInt(&ok, 10);
                 tmp.imei = query->value(1).toString();
                 tmp.sim = query->value(2).toString();
-                tmp.type = query->value(3).toString().toInt(&ok, 10);
+                tmp.type = (query->value(3).toString().toInt(&ok, 10)) & 0xff;
                 if (tmp.type > DEV_UNKNOWN) tmp.type = DEV_UNKNOWN;
                 QString stx = QString::number(ix, 10) + " : " +
                         QString::number(tmp.index, 10) + " | " +
@@ -1524,7 +1544,7 @@ void MainWindow::on_starting_clicked()
 
     tcpServer = new QTcpServer(this);
 
-    if (tcpServer == NULL) {
+    if (!tcpServer) {
         MyError |= 1;//create server object error - no memory
         throw TheError(MyError);
     }
@@ -1532,7 +1552,7 @@ void MainWindow::on_starting_clicked()
     QString stx = "Server start with database `" + *db_name + "`, listen port " + QString::number(port, 10);
 
     connect(tcpServer, SIGNAL(newConnection()), this, SLOT(newuser()));
-    if (!tcpServer->listen(QHostAddress("0.0.0.0"), port) && !server_status) {
+    if (!tcpServer->listen(QHostAddress("0.0.0.0"), port&0xffff) && !server_status) {
         stx.clear();
         stx.append("Unable to start the server : " + tcpServer->errorString() + "\n");
     } else {
@@ -1544,7 +1564,7 @@ void MainWindow::on_starting_clicked()
     statusBar()->showMessage(stx);
     LogSave(__func__, stx, true);
     ui->sending->setEnabled(false);
-    memset((uint8_t *)&pins, 0, sizeof(s_pins));
+    memset(&pins, 0, sizeof(s_pins));
 
 }
 //-----------------------------------------------------------------------
@@ -1595,7 +1615,7 @@ void MainWindow::newuser()
             connect(this, SIGNAL(sigRdyPack(int)), this, SLOT(slotRdyPack(int)));
             statusBar()->clearMessage(); statusBar()->showMessage(stx);
             ui->sending->setEnabled(true);
-            memset((uint8_t *)&pins, 0, sizeof(s_pins));
+            memset(&pins, 0, sizeof(s_pins));
             thecar.index = 0;
             thecar.imei  = "";
             thecar.sim   = "";
@@ -1689,7 +1709,9 @@ QString stx;
             statusBar()->clearMessage(); statusBar()->showMessage(stx);
 
             //--------------------- send ack : cnt_pack ----------------------------
-            memset(to_cli, 0, 4); to_cli[3] = cnt_pack; cliSocket->write(to_cli, 4);
+            memset(to_cli, 0, 4);
+            to_cli[3] = cnt_pack;
+            cliSocket->write(to_cli, 4);
 
             emit sigRdyPack(lenrecv);
         }
@@ -1769,7 +1791,7 @@ void MainWindow::slotRdyPack(int ilen)
                     struct tm *ct = localtime(&ict);
                     QString dt; dt.sprintf("%02d:%02d:%02d  ", ct->tm_hour, ct->tm_min, ct->tm_sec);
                     PrnTextInfo(dt + qstx);
-                    LogSave(NULL, qstx, 0);
+                    LogSave(nullptr, qstx, 0);
                     codec_id = 0;
                 }
             } else LogSave(__func__, "Error codec_id = " + QString::number(codec_id, 10), 1);
