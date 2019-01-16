@@ -28,11 +28,25 @@ Window {
 import QtQuick 2.9
 import QtLocation 5.11
 import QtPositioning 5.6
+import CppToQml 1.0
 
 Rectangle  {
     width: 880
     height: 260
     visible: true
+/*
+        //property variant sourceData: [64.10]
+        property variant sourceData: [cppClass.lat_data]
+        CNameQml {
+            id: cppClass
+            //property variant sourceData: [CNameQml.lat_data]
+            //property double sourceData: cppClass.lat_data
+            onLat_dataChanged: {
+                //sourceData: 0.0//lat_data
+                console.log("SigCord !");
+            }
+        }
+*/
 
     Plugin {
         id: mapPlugin
@@ -41,9 +55,10 @@ Rectangle  {
     Map {
         anchors.fill: parent
         plugin: mapPlugin
-        center: QtPositioning.coordinate(54.699650, 20.514000) // Klgd
+        center: QtPositioning.coordinate(54.699680, 20.514001) // Klgd
         zoomLevel: 13.5
     }
+/**/
 }
 
 

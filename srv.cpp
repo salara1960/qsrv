@@ -39,7 +39,9 @@
 //char const *vers = "2.1.1";//12.12.2018 - minor changes : add gui effects
 //char const *vers = "2.1.2";//13.12.2018 - minor changes : add background image in gui
 //char const *vers = "3.0";//27.12.2018 - major changes : add qquickwidget for map
-char const *vers = "3.1";//14.01.2019 - major changes : make map without qml
+//char const *vers = "3.1";//14.01.2019 - major changes : make map without qml
+//char const *vers = "3.2";//15.01.2019 - major changes : make map with qml
+char const *vers = "3.3";//16.01.2019 - minor changes : make map with qml (remove unused object)
 
 
 
@@ -1372,16 +1374,15 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
         throw TheError(MyError);
     }
 
+    wid = nullptr;
+    qmlRegisterType<MainWindow>("CppToQml", 1, 0, "CNameQml");
     wid = new QQuickWidget(QUrl(QStringLiteral("qrc:/srv.qml")), ui->qWidget);
-    eng = nullptr;
-    connect(this, SIGNAL(sigMkMap()), this, SLOT(MkMap()));
-    emit sigMkMap();
+    if (wid) wid->hide();
 
 }
 //-----------------------------------------------------------------------
 MainWindow::~MainWindow()
 {
-    if (eng) delete eng;
     if (wid) delete wid;
 
     if (query) {
@@ -1398,15 +1399,30 @@ MainWindow::~MainWindow()
     delete movie;
     delete ui;
 }
-//--------------------------------------------------------------------------
-void MainWindow::MkMap()
+//==========================================================================
+double MainWindow::get_lat() const
 {
-    if (wid) {
-        if (eng) { delete eng; eng = nullptr; }
-        eng = new QQmlApplicationEngine(wid);
+    return latitude;
+}
+//
+void MainWindow::set_lat(double lt)
+{
+    if (lt != latitude) {
+        latitude = lt;
+//        emit lat_dataChanged(latitude);
     }
 }
-//--------------------------------------------------------------------------
+//
+void MainWindow::ShowMap()
+{
+    if (wid) wid->show();
+}
+//
+void MainWindow::HideMap()
+{
+    if (wid) wid->hide();
+}
+//==========================================================================
 void MainWindow::PrnTextInfo(QString st)
 {
     ui->textinfo->append(st);
@@ -1566,6 +1582,10 @@ void MainWindow::on_starting_clicked()
     ui->sending->setEnabled(false);
     memset(&pins, 0, sizeof(s_pins));
 
+/**/
+    ShowMap();
+/**/
+
 }
 //-----------------------------------------------------------------------
 void MainWindow::on_stoping_clicked()
@@ -1589,6 +1609,10 @@ void MainWindow::on_stoping_clicked()
 
         movie->stop();
         ui->avto->setVisible(false);
+
+        /**/
+            HideMap();
+        /**/
     }
 }
 //-----------------------------------------------------------------------
@@ -1993,6 +2017,15 @@ void MainWindow::timerEvent(QTimerEvent *event)
                     ctimka->tm_min,
                     ctimka->tm_sec);
         setWindowTitle(title + " ver. " + vers + dt);
+        /*
+        cfirst++;
+        if (first) {
+            if (cfirst == 2) {
+                first = false;
+                emit sigMkMap();
+            }
+        }
+        */
     }
 }
 //-----------------------------------------------------------------------

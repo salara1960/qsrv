@@ -31,6 +31,7 @@
 
 #include <QtQuickWidgets/QQuickWidget>
 #include <QQmlApplicationEngine>
+#include <QQuickView>
 
 //********************************************************************************
 #define size_imei 15
@@ -157,7 +158,7 @@ extern uint8_t dbg;
 extern char gradus;
 extern const char *prio_name[];
 extern const char *unknown;
-extern const char *lat_name[];     // широта Latitude
+extern const char *lat_name[];       // широта Latitude
 extern const char *lon_name[];       // долгота Longitude
 extern const char *net_type_name[];
 
@@ -184,6 +185,7 @@ class QTcpServer;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
+    Q_PROPERTY(double lat_data READ get_lat WRITE set_lat NOTIFY lat_dataChanged)
 
 public:
 
@@ -196,6 +198,10 @@ public:
     explicit MainWindow(QWidget *parent = nullptr, int p = 9090, QString *dnm = nullptr);
     ~MainWindow();
     void timerEvent(QTimerEvent *event);
+
+    double get_lat() const;
+    void set_lat(double val);
+
 
 public slots:
 
@@ -213,6 +219,7 @@ public slots:
     void clearParam(int);
     void UpdatePins();
 
+
 private slots:
 
     void ShowHideData(bool);
@@ -227,7 +234,8 @@ private slots:
 
     bool check_dev(s_car *car);
     void sql_err_msg(QSqlError &er);
-    void MkMap();
+    void ShowMap();
+    void HideMap();
 
 signals:
 
@@ -235,7 +243,8 @@ signals:
     void sigRdyPack(int);
     void sigSending();
     void sigWaitDone();
-    void sigMkMap();
+
+    void lat_dataChanged(double val);
 
 private:
 
@@ -258,9 +267,11 @@ private:
     bool openok, good;
     QSqlError sql_err;
     s_car thecar;
-    QQmlApplicationEngine *eng;
+
     QQuickWidget *wid;
+    double latitude, longitude;
 
 };
+
 
 #endif // SRV_H
