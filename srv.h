@@ -30,6 +30,7 @@
 #include <QListWidget>
 
 #include <QtQuickWidgets/QQuickWidget>
+#include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickView>
 
@@ -149,6 +150,11 @@ typedef struct
     uint8_t type;
 } s_car;
 
+struct s_cord
+{
+    double latitude;
+    double longitude;
+};
 //********************************************************************************
 
 extern int srv_port;
@@ -168,6 +174,8 @@ extern const char *mk_table;
 extern const char *cmds0[];
 extern const char *cmds1[];
 
+extern s_cord cord;
+
 extern void parse_param_start(char *param);
 
 //********************************************************************************
@@ -182,10 +190,13 @@ namespace Ui {
 
 class QTcpServer;
 
+
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
-    Q_PROPERTY(double lat_data READ get_lat WRITE set_lat NOTIFY lat_dataChanged)
+    //Q_PROPERTY(double lat MEMBER latitude READ lat WRITE setlat NOTIFY latChanged)
+    Q_PROPERTY(double lat READ lat WRITE setlat NOTIFY latChanged)
 
 public:
 
@@ -199,12 +210,9 @@ public:
     ~MainWindow();
     void timerEvent(QTimerEvent *event);
 
-    double get_lat() const;
-    void set_lat(double val);
-
+    Q_INVOKABLE double lat() const;
 
 public slots:
-
     void PrnTextInfo(QString);
     void LogSave(const char *, QString, bool);
     uint16_t ks(uint8_t *, int);
@@ -214,14 +222,14 @@ public slots:
     int ParseResp(QString, char *);
     int CalcFuel(uint16_t, uint8_t);
     QJsonObject *ConvertStrToJsonObject(char *, int *);
-    int parse_data_from_dev(char *, int, QJsonObject *, int *);
+    int parse_data_from_dev(char *, int, QJsonObject *, int *, s_cord *);
     void slotErrorClient(QAbstractSocket::SocketError);
     void clearParam(int);
     void UpdatePins();
 
+    void setlat(double newVal);
 
 private slots:
-
     void ShowHideData(bool);
     void on_starting_clicked();
     void on_stoping_clicked();
@@ -231,23 +239,20 @@ private slots:
     void slotCliDone(QTcpSocket *, int);
     void slotRdyPack(int);
     void slotWaitDone();
-
     bool check_dev(s_car *car);
     void sql_err_msg(QSqlError &er);
     void ShowMap();
     void HideMap();
 
 signals:
-
     void sigCliDone(QTcpSocket *, int);
     void sigRdyPack(int);
     void sigSending();
     void sigWaitDone();
 
-    void lat_dataChanged(double val);
+    void latChanged(double lat);
 
 private:
-
     bool client, auth, rdy;
     int MyError, port, rxdata, txdata, lenrecv;
     int cmd_id, fd, tmr_ack, tmr_sec, server_status;

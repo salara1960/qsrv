@@ -4,6 +4,7 @@
         <file>png/transport6.gif</file>
         <file>png/ignition111.png</file>
         <file>png/avto1111.png</file>
+        <file>png/marker.png</file>
         <file>srv.qml</file>
     </qresource>
 </RCC>

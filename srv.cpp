@@ -41,7 +41,9 @@
 //char const *vers = "3.0";//27.12.2018 - major changes : add qquickwidget for map
 //char const *vers = "3.1";//14.01.2019 - major changes : make map without qml
 //char const *vers = "3.2";//15.01.2019 - major changes : make map with qml
-char const *vers = "3.3";//16.01.2019 - minor changes : make map with qml (remove unused object)
+//char const *vers = "3.3";//16.01.2019 - minor changes : make map with qml (remove unused object)
+//char const *vers = "3.4";//18.01.2019 - minor changes : used new-style cast
+char const *vers = "3.5";//21.01.2019 - minor changes : add on map marker item
 
 
 
@@ -49,6 +51,8 @@ const QString title = "GPS device (Teltonika) server application";
 const QString LogFileName = "logs.txt";
 uint8_t dbg = 2;
 const int time_wait_answer = 10000;//10 sec.
+
+s_cord cord = {54.699680 , 20.514001};
 
 int srv_port = 0;
 QString sdnm = "";
@@ -289,9 +293,11 @@ const char *cmu = nullptr;
 
     alen = sizeof(s_avl_cmd) + ((len + 5) * cnt) + 5;
 
-    tmp = (uint8_t *)calloc(1, alen + 1);
+    //tmp = (uint8_t *)calloc(1, alen + 1);
+    tmp = reinterpret_cast<uint8_t *>(calloc(1, alen + 1));
     if (tmp) {
-        hdr = (s_avl_cmd *)tmp;
+        //hdr = (s_avl_cmd *)tmp;
+        hdr = reinterpret_cast < s_avl_cmd * > ( tmp );
         hdr->codec_id = CodecID12;//0x0c;
         hdr->cmd_cnt = cnt;
         uk = tmp + sizeof(s_avl_cmd);//uk to command_type
@@ -308,14 +314,15 @@ const char *cmu = nullptr;
 
         uk ++;//uk to crc
         tp = tmp + (sizeof(uint32_t) << 1);
-        tlen = uk - tp; hdr->tlen = htonl(tlen);
-        crc = htonl( ks(tp, uk - tp) );
+        tlen = static_cast<uint32_t>(uk - tp);
+        hdr->tlen = htonl(tlen);
+        crc = htonl( ks(tp, static_cast<int>(uk - tp)) );
         memcpy(uk, &crc, sizeof(uint32_t)); uk += sizeof(uint32_t);
 
-        ret = uk - tmp;
+        ret = static_cast<int>(uk - tmp);
 
         if (ret > 0) {
-            memcpy((uint8_t *)buf, tmp, ret);
+            memcpy(reinterpret_cast<uint8_t *>(buf), tmp, static_cast<size_t>(ret));
             memcpy(par, cds, len);
         }
 
@@ -725,7 +732,7 @@ int arr_len = 0, ct = 0;
                                 ct = 0;
                                 sprintf(tp+strlen(tp)," ");
                                 while (ct < arr_len) {
-                                    sprintf(tp+strlen(tp), "%s", (char *)tmp.toArray().at(ct).toString().data());
+                                    sprintf(tp+strlen(tp), "%s", reinterpret_cast<char *>(tmp.toArray().at(ct).toString().data()));
                                     if (++ct != arr_len) sprintf(tp+strlen(tp), ",");
                                 }
                             } else ret = -1;
@@ -815,7 +822,7 @@ char *uki = nullptr, *uks = nullptr, *uke = nullptr, *ukend = nullptr;
 
     if (!st) return ret;
     else {
-        dl = strlen(st);
+        dl = strlen(st) & 0x7fffffff;
         if (!dl) return ret;
     }
 
@@ -845,12 +852,12 @@ char *uki = nullptr, *uks = nullptr, *uke = nullptr, *ukend = nullptr;
                 if (uke) {
                     if (*(uke+1) == ' ') uke++;
                     memset(tp, 0, sizeof(tp));
-                    memcpy(tp, uks, uke-uks);
-                    dl = strlen(tp);
+                    memcpy(tp, uks, static_cast<size_t>(uke - uks));
+                    dl = static_cast<int>(strlen(tp));
                     if (!dl) sprintf(tp,"UnknownParam_%d", cnt);
                     else {
                         if (tp[dl - 1] == ':') tp[dl - 1] = '\0';
-                        dl = strlen(tp);
+                        dl = static_cast<int>(strlen(tp));
                         if (!dl) sprintf(tp,"UnknownParam_%d", cnt);
                     }
                     uks = uke + 1;
@@ -858,8 +865,8 @@ char *uki = nullptr, *uks = nullptr, *uke = nullptr, *ukend = nullptr;
                     if (!uke) uke = strchr(uks,'\0');
                     if (uke) {
                         memset(val, 0, sizeof(val));
-                        dl = uke - uks; if (dl >= max_str) dl = max_str - 1;
-                        memcpy(val, uks, dl);
+                        dl = static_cast<int>(uke - uks); if (dl >= max_str) dl = max_str - 1;
+                        memcpy(val, uks, static_cast<size_t>(dl));
                         ret->insert(tp, QJsonValue(val));
                         uks = uke + 1;
                     } else { err = 1; break; }
@@ -874,7 +881,7 @@ char *uki = nullptr, *uks = nullptr, *uke = nullptr, *ukend = nullptr;
             uke = strchr(uks, ':');
             if (uke) {
                 memset(tp, 0, sizeof(tp));
-                memcpy(tp, uks, uke - uks);
+                memcpy(tp, uks, static_cast<size_t>(uke - uks));
                 if (strlen(tp)) {
                     uki = &tp[strlen(tp)-1]; if ( *uki == ' ') *uki = '\0';
                     ret->insert("Cmd", QJsonValue(tp));
@@ -882,7 +889,7 @@ char *uki = nullptr, *uks = nullptr, *uke = nullptr, *ukend = nullptr;
                     uke = strchr(uks, '\0');
                     if (uke) {
                         memset(val, 0, sizeof(val));
-                        memcpy(val, uks, uke - uks);
+                        memcpy(val, uks, static_cast<size_t>(uke - uks));
                         uki = strstr(val, "\r\n"); if (uki) *uki = '\0';
                         ret->insert("Result", QJsonValue(val));
                         err = 0;
@@ -895,10 +902,10 @@ char *uki = nullptr, *uks = nullptr, *uke = nullptr, *ukend = nullptr;
             uks = strstr(st, form);
             if (uks) {
                 uks += strlen(form);
-                char cha = *uks++; if ((cha == '1') || (cha == '0')) pins.dout1 = cha - 0x30;
-                cha = *uks++;      if ((cha == '1') || (cha == '0')) pins.dout2 = cha - 0x30;
-                cha = *uks++;      if ((cha == '1') || (cha == '0')) pins.dout3 = cha - 0x30;
-                cha = *uks;        if ((cha == '1') || (cha == '0')) pins.dout4 = cha - 0x30;
+                char cha = *uks++; if ((cha == '1') || (cha == '0')) pins.dout1 = static_cast<uint8_t>(cha - 0x30);
+                cha = *uks++;      if ((cha == '1') || (cha == '0')) pins.dout2 = static_cast<uint8_t>(cha - 0x30);
+                cha = *uks++;      if ((cha == '1') || (cha == '0')) pins.dout3 = static_cast<uint8_t>(cha - 0x30);
+                cha = *uks;        if ((cha == '1') || (cha == '0')) pins.dout4 = static_cast<uint8_t>(cha - 0x30);
                 up = 1;
             }
         break;
@@ -912,19 +919,19 @@ char *uki = nullptr, *uks = nullptr, *uke = nullptr, *ukend = nullptr;
     if (!err && ret) {
         if (cmd == 15)  {
             QJsonValue tmp;
-            tmp = ret->value("DI1"); if (!tmp.isUndefined()) pins.din1 = tmp.toString().toInt();
-            tmp = ret->value("DI2"); if (!tmp.isUndefined()) pins.din2 = tmp.toString().toInt();
-            tmp = ret->value("DI3"); if (!tmp.isUndefined()) pins.din3 = tmp.toString().toInt();
-            tmp = ret->value("DI4"); if (!tmp.isUndefined()) pins.din4 = tmp.toString().toInt();
+            tmp = ret->value("DI1"); if (!tmp.isUndefined()) pins.din1 = static_cast<uint8_t>(tmp.toString().toInt());
+            tmp = ret->value("DI2"); if (!tmp.isUndefined()) pins.din2 = static_cast<uint8_t>(tmp.toString().toInt());
+            tmp = ret->value("DI3"); if (!tmp.isUndefined()) pins.din3 = static_cast<uint8_t>(tmp.toString().toInt());
+            tmp = ret->value("DI4"); if (!tmp.isUndefined()) pins.din4 = static_cast<uint8_t>(tmp.toString().toInt());
 
-            tmp = ret->value("DO1"); if (!tmp.isUndefined()) pins.dout1 = tmp.toString().toInt();
-            tmp = ret->value("DO2"); if (!tmp.isUndefined()) pins.dout2 = tmp.toString().toInt();
-            tmp = ret->value("DO3"); if (!tmp.isUndefined()) pins.dout3 = tmp.toString().toInt();
-            tmp = ret->value("DO4"); if (!tmp.isUndefined()) pins.dout4 = tmp.toString().toInt();
+            tmp = ret->value("DO1"); if (!tmp.isUndefined()) pins.dout1 = static_cast<uint8_t>(tmp.toString().toInt());
+            tmp = ret->value("DO2"); if (!tmp.isUndefined()) pins.dout2 = static_cast<uint8_t>(tmp.toString().toInt());
+            tmp = ret->value("DO3"); if (!tmp.isUndefined()) pins.dout3 = static_cast<uint8_t>(tmp.toString().toInt());
+            tmp = ret->value("DO4"); if (!tmp.isUndefined()) pins.dout4 = static_cast<uint8_t>(tmp.toString().toInt());
 
-            tmp = ret->value("AIN1"); if (!tmp.isUndefined()) pins.ain1 = tmp.toString().toInt();
-            tmp = ret->value("AIN2"); if (!tmp.isUndefined()) pins.ain2 = tmp.toString().toInt();
-            tmp = ret->value("AIN3"); if (!tmp.isUndefined()) pins.ain3 = tmp.toString().toInt();
+            tmp = ret->value("AIN1"); if (!tmp.isUndefined()) pins.ain1 = static_cast<uint16_t>(tmp.toString().toInt());
+            tmp = ret->value("AIN2"); if (!tmp.isUndefined()) pins.ain2 = static_cast<uint16_t>(tmp.toString().toInt());
+            tmp = ret->value("AIN3"); if (!tmp.isUndefined()) pins.ain3 = static_cast<uint16_t>(tmp.toString().toInt());
             up = 1;
         }
     }
@@ -935,7 +942,7 @@ char *uki = nullptr, *uks = nullptr, *uke = nullptr, *ukend = nullptr;
     return ret;
 }
 //----------------------------------------------------------------------------------------------------------------------------
-int MainWindow::parse_data_from_dev(char *lin, int dline, QJsonObject *js, int *kom)
+int MainWindow::parse_data_from_dev(char *lin, int dline, QJsonObject *js, int *kom, s_cord *cor)
 {
 int ret = 0, el_dl;
 char stx[max_tmp_len] = {0};
@@ -958,6 +965,7 @@ uint8_t byte;
 uint16_t word;
 uint64_t dint8;
 float latit, longit, rdat;
+double dlat = 0.0, dlon = 0.0;
 QJsonObject *jpack = nullptr, *jarr_io = nullptr, *jans = nullptr, *jsta = nullptr;
 QJsonArray *jarr = nullptr;
 uint8_t ign = 0, door = 1, trunk = 1, skp = 1, hood = 0, tah = 0;
@@ -968,7 +976,7 @@ QString qstx, qstz;
 
 
 
-    if ((dline < (int)sizeof(s_hdr_pack_bin)) || (dline >= (int)buf_size) || (js == nullptr)) {
+    if ((dline < static_cast<int>(sizeof(s_hdr_pack_bin))) || (dline >= static_cast<int>(buf_size)) || (js == nullptr)) {
         qstx.sprintf("Parse AVL error or ack for command -> len=%d\n", dline);
         LogSave(__func__, qstx, 1);
         return -1;
@@ -978,20 +986,20 @@ QString qstx, qstz;
         LogSave(__func__, qstx, 1);
     }
 
-    g_bin = (s_gps_pack_bin *)calloc(1, sizeof(s_gps_pack_bin));
+    g_bin = reinterpret_cast<s_gps_pack_bin *>(calloc(1, sizeof(s_gps_pack_bin)));
     if (!g_bin) return -1;
 
-    st = (uint8_t *)calloc(1, dline + 1);
+    st = reinterpret_cast<uint8_t *>(calloc(1, (dline + 1)&0x7fffffff));
     if (!st) {
         if (g_bin) free(g_bin);
         return -1;
     }
 
-    memcpy(st, lin, dline);
+    memcpy(st, lin, dline&0x7fffffff);
     uk = &st[0];
 
-    h_bin = (s_hdr_pack_bin *)&st[0];//for codec.id=8
-    h_bin_ack = (s_hdr_bin_ack *)&st[0];//for codec.id=12
+    h_bin = reinterpret_cast<s_hdr_pack_bin *>(st);//for codec.id=8
+    h_bin_ack = reinterpret_cast<s_hdr_bin_ack *>(st);//for codec.id=12
 
     if (dbg >= 2) {
         memset(sta, 0, sizeof(sta));
@@ -1015,7 +1023,7 @@ QString qstx, qstz;
     if ((codec_id == CodecID12) || (codec_id == CodecID13)) {//answer for command
         if (dbg >= 2) LogSave(nullptr, "DATA:\n", 0);
         n_cnt = 0; i = 0;
-        len = ntohl(h_bin_ack->len);
+        len = static_cast<int>(ntohl(h_bin_ack->len));
         uk += sizeof(s_hdr_bin_ack);
         if (codec_id == CodecID13) {
             memcpy(&dword, uk, 4);
@@ -1024,9 +1032,9 @@ QString qstx, qstz;
         }
         while (n_cnt < h_bin_ack->numbers_pack) {
             n_cnt++;
-            stm = (char *)calloc(1, len + 1);
+            stm = reinterpret_cast<char *>( calloc(1, (len + 1)&0x7fffffff) );
             if (stm) {
-                memcpy(stm, uk, len);
+                memcpy(stm, uk, len&0x7fffffff);
                 if ((strstr(stm,"Error")) || (strstr(stm,"ERROR"))) i = 1;
                 jans = ConvertStrToJsonObject(stm, kom);
                 if (jans) {
@@ -1045,14 +1053,15 @@ QString qstx, qstz;
                 if (n_cnt < h_bin_ack->numbers_pack) {
                     uk += len;
                     memcpy(&len, uk, sizeof(uint32_t));//get len for next pack
-                    len = ntohl(len);
+                    uint32_t lent = (ntohl(static_cast<uint32_t>(len)));
+                    len = static_cast<int>(lent);
                 }
                 free(stm); stm = nullptr;
             }
         }
 
         if (jarr) {
-            if (codec_id == CodecID13) js->insert("TimeStamp", QJsonValue((qint32)dword));
+            if (codec_id == CodecID13) js->insert("TimeStamp", QJsonValue(static_cast<qint32>(dword)));
             js->insert("DATA", QJsonValue(*jarr));
             js->insert("Status", QJsonValue(i));
             delete jarr; jarr = nullptr;
@@ -1074,33 +1083,33 @@ QString qstx, qstz;
         len += sizeof(s_pack_bin);
         if (dline >= len) {
             //-------------------------------  HEADER PACK  ------------------------------------------------------
-            p_bin = (s_pack_bin *)uk;
+            p_bin = reinterpret_cast<s_pack_bin *>(uk);
             dint8 = be64toh(p_bin->ts);
             tim = dint8 / 1000;
             if (p_bin->prio < total_prio) ptr = &prio_name[p_bin->prio][0]; else ptr = unknown;
             if (dbg >= 2) {
                 memset(stz, 0, sizeof(stz));
                 memset(sta, 0, sizeof(sta));
-                for (i = 0; i < (int)sizeof(s_pack_bin); i++) sprintf(sta+strlen(sta),"%02X", *(uk+i));
+                for (i = 0; i < static_cast<int>(sizeof(s_pack_bin)); i++) sprintf(sta+strlen(sta),"%02X", *(uk+i));
                 sprintf(stx,"[%d] PACK(%d):%s\nTimeStamp:\t%s\t0x%" PRIX64 "\t%" PRIu64 "\t%u\nPriority:\t%x\t%s\n",
                         more + 1,
-                        (int)sizeof(s_pack_bin),
+                        static_cast<int>(sizeof(s_pack_bin)),
                         sta,
                         ShowTime(&tim, stz),
-                        dint8, dint8, (uint32_t)tim,
+                        dint8, dint8, static_cast<uint32_t>(tim),
                         p_bin->prio,
                         ptr);
                 qstx.clear(); qstx.append(stx);
                 LogSave(nullptr, qstx, 0);
             }
             jpack = new QJsonObject();
-            jpack->insert("TimeStamp", QJsonValue((qint32)tim));
-            jpack->insert("Priority", QJsonValue((const char *)ptr));
+            jpack->insert("TimeStamp", QJsonValue(static_cast<qint32>(tim)));
+            jpack->insert("Priority", QJsonValue(reinterpret_cast<const char *>(ptr)));
             //-------------------------------   GPS  ------------------------------------------------------
-            memset((uint8_t *)g_bin, 0, sizeof(s_gps_pack_bin));
+            memset(reinterpret_cast<uint8_t *>(g_bin), 0, sizeof(s_gps_pack_bin));
             g_bin->latitude = ntohl(p_bin->latitude);   latit = g_bin->latitude;   latit /= 10000000;
             g_bin->longitude = ntohl(p_bin->longitude); longit = g_bin->longitude; longit /= 10000000;
-            g_bin->altitude = ntohs(p_bin->altitude);
+            g_bin->altitude = static_cast<short>(ntohs(static_cast<uint16_t>(p_bin->altitude)));
             g_bin->angle = ntohs(p_bin->angle);
             g_bin->sattelites = p_bin->sattelites;
             g_bin->speed = ntohs(p_bin->speed);
@@ -1110,16 +1119,20 @@ QString qstx, qstz;
             if (g_bin->longitude & 0x80000000) dol = 1;    // западная долгота
                                           else dol = 0;    // восточная долгота
             delitel = 10000000;
-            lat = g_bin->latitude; lat /= delitel;    g_bin->latitude_grad = lat;//grad
-            intm = (lat - g_bin->latitude_grad) * delitel; lat = intm; lat /= delitel; lat *= 60; g_bin->latitude_min = lat;//min
+            lat = g_bin->latitude; lat /= delitel; g_bin->latitude_grad = static_cast<uint16_t>(lat);//grad
+            intm = static_cast<int>((lat - g_bin->latitude_grad) * delitel); lat = intm; lat /= delitel; lat *= 60;
+            g_bin->latitude_min = static_cast<uint16_t>(lat);//min
             delitel /= 10;
-            intm = (lat - g_bin->latitude_min) * delitel; lat = intm; lat /= delitel; lat *= 60; g_bin->latitude_sec = lat;//sec
+            intm = static_cast<int>((lat - g_bin->latitude_min) * delitel); lat = intm; lat /= delitel; lat *= 60;
+            g_bin->latitude_sec = static_cast<uint16_t>(lat);//sec
 
             delitel = 10000000;
-            lon = g_bin->longitude; lon /= delitel;    g_bin->longitude_grad = lon;//grad
-            intm = (lon - g_bin->longitude_grad) * delitel; lon = intm; lon /= delitel; lon *= 60; g_bin->longitude_min = lon;//min
+            lon = g_bin->longitude; lon /= delitel;    g_bin->longitude_grad = static_cast<uint16_t>(lon);//grad
+            intm = static_cast<int>((lon - g_bin->longitude_grad) * delitel); lon = intm; lon /= delitel; lon *= 60;
+            g_bin->longitude_min = static_cast<uint16_t>(lon);//min
             delitel /=10;
-            intm = (lon - g_bin->longitude_min) * delitel; lon = intm; lon /= delitel; lon *= 60; g_bin->longitude_sec = lon;//sec
+            intm = static_cast<int>((lon - g_bin->longitude_min) * delitel); lon = intm; lon /= delitel; lon *= 60;
+            g_bin->longitude_sec = static_cast<uint16_t>(lon);//sec
 
             if (dbg >= 2) {
                 memset(sta, 0, sizeof(sta));
@@ -1132,8 +1145,8 @@ QString qstx, qstz;
                 else if (g_bin->angle == 225) sprintf(sta," South-West");
                 else if (g_bin->angle == 135) sprintf(sta," South-East");
                 sprintf(stx, "GPS:\n%s Latitude:\t%d%c%d\"%d'\t%f\n%s Longitude:\t%d%c%d\"%d'\t%f\nAltitude:\t%d meters\nAngel:\t\t%d%c\t%s\nSattelites:\t%d\nSpeed:\t\t%d km/h\n",
-                             lat_name[shi], g_bin->latitude_grad, gradus, g_bin->latitude_min, g_bin->latitude_sec, latit,
-                             lon_name[dol], g_bin->longitude_grad, gradus, g_bin->longitude_min, g_bin->longitude_sec, longit,
+                             lat_name[shi], g_bin->latitude_grad, gradus, g_bin->latitude_min, g_bin->latitude_sec, static_cast<double>(latit),
+                             lon_name[dol], g_bin->longitude_grad, gradus, g_bin->longitude_min, g_bin->longitude_sec, static_cast<double>(longit),
                              g_bin->altitude,
                              g_bin->angle, gradus, sta,
                              g_bin->sattelites,
@@ -1141,15 +1154,17 @@ QString qstx, qstz;
                 qstx.clear(); qstx.append(stx);
                 LogSave(nullptr, qstx, 0);
             }
-            jpack->insert("Latitude",  QJsonValue(latit));
-            jpack->insert("Longitude", QJsonValue(longit));
+            dlat = static_cast<double>(latit);
+            dlon = static_cast<double>(longit);
+            jpack->insert("Latitude",  QJsonValue(dlat));
+            jpack->insert("Longitude", QJsonValue(dlon));
             jpack->insert("Altitude",  QJsonValue(g_bin->altitude));
             jpack->insert("Angle",     QJsonValue(g_bin->angle));
             jpack->insert("Sattelites",QJsonValue(g_bin->sattelites));
             jpack->insert("Speed",     QJsonValue(g_bin->speed));
             //-----------------------  show gps data  --------------------------------------------
-            qstx.clear(); ui->latitude->setText(qstx.setNum(latit, 'f', 8));
-            qstx.clear(); ui->longitude->setText(qstx.setNum(longit, 'f', 8));
+            qstx.clear(); ui->latitude->setText(qstx.setNum(dlat, 'f', 8));
+            qstx.clear(); ui->longitude->setText(qstx.setNum(dlon, 'f', 8));
             ui->altitude->setText(QString::number(g_bin->altitude, 10));
             ui->angle->setText(QString::number(g_bin->angle, 10));
             ui->sat->setText(QString::number(g_bin->sattelites, 10));
@@ -1216,7 +1231,7 @@ QString qstx, qstz;
                             }
                         break;
                         case 2:
-                            memcpy(&word, uk, el_dl);
+                            memcpy(&word, uk, static_cast<size_t>(el_dl));
                             dint8 = htons(word) & 0xffff;
                             switch (cmd_id) {
                                 case 9://AIN1 - fuel (ДУТ)
@@ -1236,11 +1251,11 @@ QString qstx, qstz;
                             }
                         break;
                         case 4:
-                            memcpy(&dword, uk, el_dl);
-                            dint8 = (uint32_t)htonl(dword);
+                            memcpy(&dword, uk, static_cast<size_t>(el_dl));
+                            dint8 = static_cast<uint32_t>(htonl(dword));
                         break;
                         case 8:
-                            memcpy(&dint8, uk, el_dl);
+                            memcpy(&dint8, uk, static_cast<size_t>(el_dl));
                             dint8 = be64toh(dint8);
                         break;
                     }
@@ -1253,12 +1268,16 @@ QString qstx, qstz;
                             if (dbg >= 2) sprintf(stx+strlen(stx),"\t[%u]:\tio(%03u)=%" PRIu64 "\t'%s'\t(%s)\n", ind + 1, cmd_id, dint8, stz, net_type_name[dint8&1]);
                         break;
                         case 70: //"PCBTemp"
-                            temp_pcb = (short)dint8; rdat = temp_pcb; rdat /= 10.0; rdat = round(rdat * 10.0); rdat /= 10.0;
-                            jarr_io->insert(qstz, QJsonValue(rdat));
-                            if (dbg >= 2) sprintf(stx+strlen(stx),"\t[%u]:\tio(%03u)=%" PRIu64 "\t'%s'\t(%.1f%c)\n", ind + 1, cmd_id, dint8, stz, rdat, gradus);
+                            temp_pcb = static_cast<short>(dint8);
+                            rdat = temp_pcb;
+                            rdat /= 10.0f;
+                            rdat = roundf(rdat * 10.0f);
+                            rdat /= 10.0f;
+                            jarr_io->insert(qstz, QJsonValue(static_cast<double>(rdat)));
+                            if (dbg >= 2) sprintf(stx+strlen(stx),"\t[%u]:\tio(%03u)=%" PRIu64 "\t'%s'\t(%.1f%c)\n", ind + 1, cmd_id, dint8, stz, static_cast<double>(rdat), gradus);
                         break;
                         case 9://AIN1 - fuel (ДУТ)
-                            jarr_io->insert(qstz, QJsonValue((qint64)dint8));
+                            jarr_io->insert(qstz, QJsonValue(static_cast<qint64>(dint8)));
                             if (dbg >= 2) {
                                 if (ign)
                                     sprintf(stx+strlen(stx),"\t[%u]:\tio(%03u)=%" PRIu64 "\t'%s'\t%d liters\n", ind + 1, cmd_id, dint8, stz, CalcFuel(fuel, ign));
@@ -1267,7 +1286,7 @@ QString qstx, qstz;
                             }
                         break;
                         default: {
-                            jarr_io->insert(qstz, QJsonValue((qint64)dint8));
+                            jarr_io->insert(qstz, QJsonValue(static_cast<qint64>(dint8)));
                             if (dbg >= 2) sprintf(stx+strlen(stx),"\t[%u]:\tio(%03u)=%" PRIu64 "\t'%s'\n", ind + 1, cmd_id, dint8, stz);
                         }
                     }
@@ -1316,6 +1335,8 @@ QString qstx, qstz;
     if (st) free(st);
     if (g_bin) free(g_bin);
 
+    cor->latitude = dlat; cor->longitude = dlon;
+
     return ret;
 }
 
@@ -1327,12 +1348,13 @@ MainWindow::TheError::TheError(int err) { code = err; }//error class descriptor
 MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    //this->setFixedSize(this->size());
+    this->setFixedSize(this->size());
     ui->l_ignition->setVisible(false);//hide ignition
 
-    this->setWindowOpacity(0.9);//set the level of transparency
+    this->setWindowOpacity(0.95);//set the level of transparency
 
     port = p;
+    wid = nullptr;
     tcpServer = nullptr;
     query = nullptr;
     db = nullptr;
@@ -1340,6 +1362,7 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     client = auth = false;
     imei.clear(); CliUrl.clear();
     seq_number = cmd_seq_number = 0;
+
     fd = -1;
     tmr_ack = 0;
     dev_wait_answer = 0;
@@ -1374,10 +1397,11 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
         throw TheError(MyError);
     }
 
-    wid = nullptr;
+    latitude = cord.latitude;//54.699680;
+    longitude = cord.longitude;//20.514001;
     qmlRegisterType<MainWindow>("CppToQml", 1, 0, "CNameQml");
     wid = new QQuickWidget(QUrl(QStringLiteral("qrc:/srv.qml")), ui->qWidget);
-    if (wid) wid->hide();
+    //if (wid) wid->hide();
 
 }
 //-----------------------------------------------------------------------
@@ -1400,17 +1424,19 @@ MainWindow::~MainWindow()
     delete ui;
 }
 //==========================================================================
-double MainWindow::get_lat() const
+double MainWindow::lat() const
 {
     return latitude;
 }
 //
-void MainWindow::set_lat(double lt)
+void MainWindow::setlat(double newVal)
 {
-    if (lt != latitude) {
-        latitude = lt;
-//        emit lat_dataChanged(latitude);
+//#pragma clang diagnostic ignored "-Wfloat-equal"
+    if ((newVal > latitude) || (newVal < latitude)) {
+        latitude = newVal;
+        emit latChanged(latitude);
     }
+//#pragma clang diagnostic pop
 }
 //
 void MainWindow::ShowMap()
@@ -1493,7 +1519,7 @@ bool ret = false;
 //-----------------------------------------------------------------------
 void MainWindow::UpdatePins()
 {
-    ui->l_ignition->setVisible((bool)pins.din1);
+    ui->l_ignition->setVisible(static_cast<bool>(pins.din1));
     if (pins.msensor) {
         ui->avto->setVisible(true);
         movie->start();
@@ -1519,7 +1545,7 @@ void MainWindow::UpdatePins()
 //-----------------------------------------------------------------------
 void MainWindow::ShowHideData(bool flg)
 {
-    if (flg) ui->l_ignition->setVisible((bool)pins.din1);
+    if (flg) ui->l_ignition->setVisible(static_cast<bool>(pins.din1));
     else {
         ui->l_ignition->setVisible(flg);
         ui->avto->setVisible(false);
@@ -1620,7 +1646,7 @@ void MainWindow::newuser()
 {
     if (server_status) {
         QTcpSocket *cliSocket = tcpServer->nextPendingConnection();
-        fd = cliSocket->socketDescriptor();
+        fd = static_cast<int>(cliSocket->socketDescriptor());
         QString stx;
         if (!client) {
             clearParam(sizeof(s_imei)); faza = 0; dev_wait_answer = 0;
@@ -1644,6 +1670,11 @@ void MainWindow::newuser()
             thecar.imei  = "";
             thecar.sim   = "";
             thecar.type  = 0;
+
+            /**/
+                ShowMap();
+            /**/
+
         } else {
             stx.append("New client '" + CliUrl + "' online, socket " + QString::number(fd, 10) + ", but client already present !\n");
             cliSocket->close();
@@ -1655,7 +1686,7 @@ void MainWindow::newuser()
 //-----------------------------------------------------------------------
 void MainWindow::slotReadClient()
 {
-QTcpSocket *cliSocket = (QTcpSocket *)sender();
+QTcpSocket *cliSocket = dynamic_cast<QTcpSocket *>(sender());
 qint64 dl = 0;
 QString stx;
 
@@ -1665,7 +1696,7 @@ QString stx;
                 dl = cliSocket->read(from_cli + lenrecv, rxdata - lenrecv);
                 lenrecv += dl;
                 if (lenrecv == sizeof(s_imei)) {
-                    s_imei *im = (s_imei *)from_cli;
+                    s_imei *im = reinterpret_cast<s_imei *>(from_cli);
                     imei.clear(); imei.append(im->imei);
                     if (check_dev(&thecar)) {
                         ui->imei->setText(imei);
@@ -1700,8 +1731,8 @@ QString stx;
                 dl = cliSocket->read(from_cli + lenrecv, rxdata - lenrecv);
                 lenrecv += dl;
                 if (lenrecv == sizeof(s_avl_hdr)) {
-                    s_avl_hdr *hdr = (s_avl_hdr *)from_cli;
-                    rxdata = ntohl(hdr->len) + 4;
+                    s_avl_hdr *hdr = reinterpret_cast<s_avl_hdr *>(from_cli);
+                    rxdata = static_cast<int>(ntohl(hdr->len) + 4);
                     if (rxdata > max_buf) {
                         rxdata = max_buf;
                         MyError |= 4;//avl_pack len > max_buf
@@ -1717,14 +1748,14 @@ QString stx;
         dl = cliSocket->read(from_cli + lenrecv, rxdata - lenrecv);
         lenrecv += dl;
         if (lenrecv == rxdata) {
-            codec_id = from_cli[0];
-            cnt_pack = from_cli[1];
+            codec_id = static_cast<uint8_t>(from_cli[0]);
+            cnt_pack = static_cast<uint8_t>(from_cli[1]);
             switch (codec_id) {
                 case CodecID8: total_pack++; break;
                 case CodecID12: case CodecID13: total_cmd++; break;
             }
-            uint16_t ks_in = *(uint16_t *)(from_cli + lenrecv - 2); ks_in = ntohs(ks_in);
-            uint16_t ks_calc = ks((uint8_t *)from_cli, lenrecv - 4);
+            uint16_t ks_in = *(reinterpret_cast<uint16_t *>(from_cli + lenrecv - 2)); ks_in = ntohs(ks_in);
+            uint16_t ks_calc = ks(reinterpret_cast<uint8_t *>(from_cli), lenrecv - 4);
             QString stx = "Adr='" + CliUrl +
                           "' CS=0x" + QString::number(ks_in, 16) + "/0x" + QString::number(ks_calc, 16) +
                           " Len=" + QString::number(lenrecv, 10) +
@@ -1734,7 +1765,7 @@ QString stx;
 
             //--------------------- send ack : cnt_pack ----------------------------
             memset(to_cli, 0, 4);
-            to_cli[3] = cnt_pack;
+            to_cli[3] = static_cast<char>(cnt_pack);
             cliSocket->write(to_cli, 4);
 
             emit sigRdyPack(lenrecv);
@@ -1769,8 +1800,8 @@ void MainWindow::slotCliDone(QTcpSocket *cli, int prn)
 //-----------------------------------------------------------------------
 void MainWindow::slotErrorClient(QAbstractSocket::SocketError SErr)
 {
-QTcpSocket *cliSocket = (QTcpSocket *)sender();
-QString qs = "Socket ERROR (" + QString::number((int)SErr, 10) + ") : " + cliSocket->errorString();
+QTcpSocket *cliSocket = reinterpret_cast<QTcpSocket *>(sender());
+QString qs = "Socket ERROR (" + QString::number(static_cast<int>(SErr), 10) + ") : " + cliSocket->errorString();
 
     QString stx = "Close client, socket " + QString::number(cliSocket->socketDescriptor(), 10) + ". " + qs + "\n";
     PrnTextInfo(stx);
@@ -1789,7 +1820,7 @@ void MainWindow::slotRdyPack(int ilen)
             bool yes = true;
             jobj->insert("DevName", QJsonValue(dev_type_name[thecar.type]));
             jobj->insert("DevID",   QJsonValue(imei));
-            jobj->insert("ServerTime",QJsonValue((qint32)time(NULL)));
+            jobj->insert("ServerTime",QJsonValue(static_cast<qint32>(time(nullptr))));
             jobj->insert("FromAddr", QJsonValue(CliUrl));
             switch (codec_id) {
                 case CodecID8:
@@ -1809,7 +1840,7 @@ void MainWindow::slotRdyPack(int ilen)
             }
 
             if (yes) {
-                if (!parse_data_from_dev(from_cli, ilen, jobj, &cmd_id)) {
+                if (!parse_data_from_dev(from_cli, ilen, jobj, &cmd_id, &cord)) {
                     QString qstx = QJsonDocument(*jobj).toJson(QJsonDocument::Compact) + "\n";
                     time_t ict = QDateTime::currentDateTime().toTime_t();
                     struct tm *ct = localtime(&ict);
@@ -1817,6 +1848,12 @@ void MainWindow::slotRdyPack(int ilen)
                     PrnTextInfo(dt + qstx);
                     LogSave(nullptr, qstx, 0);
                     codec_id = 0;
+                    if ((latitude < cord.latitude) || (latitude > cord.latitude) || (longitude < cord.longitude) || (longitude > cord.longitude)) {
+                        dt.sprintf("%02d:%02d:%02d  coordinate: %f,%f - %f,%f\n", ct->tm_hour, ct->tm_min, ct->tm_sec, latitude, longitude, cord.latitude, cord.longitude);
+                        PrnTextInfo(dt);
+                        LogSave(nullptr, dt, 0);
+                    }
+                    setlat(cord.latitude);
                 }
             } else LogSave(__func__, "Error codec_id = " + QString::number(codec_id, 10), 1);
 
@@ -1963,13 +2000,13 @@ int dtype = thecar.type;
             }//switch(cmd_id)
 
             memset(to_cli, 0, sizeof(to_cli));
-            result = MakeAvlPacket((uint8_t *)to_cli, cid, cmd_par);
+            result = MakeAvlPacket(reinterpret_cast<uint8_t *>(to_cli), cid, cmd_par);
         } else result = -1;
         if (result > 0) {
             if (dbg) {
                 stx.clear(); stx.append("Command #" + QString::number(cmd_id,10) + " to device '" + imei + "' ready ("+QString::number(result,10) +") : ");
                 for (i = 0; i < result; i++) {
-                        sprintf(st, "%02X", (uint8_t)to_cli[i]);
+                        sprintf(st, "%02X", static_cast<uint8_t>(to_cli[i]));
                         stx.append(st);
                 }
                 PrnTextInfo(stx);
