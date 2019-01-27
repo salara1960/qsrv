@@ -1,5 +1,6 @@
 #include "srv.h"
 
+
 int main(int argc, char *argv[])
 {
 int port = 9090, cerr = 0;
@@ -15,7 +16,18 @@ QString dnm("cars.s3db");
 
     try {
         QApplication srv(argc, argv);
+
+        //qmlRegisterType<CordClass>("CppToQml", 1, 0, "TheClass");
+
         MainWindow wnd(nullptr, port, &dnm);
+
+/*
+        //MainWindow::CordClass cClass(wids);
+        QQmlApplicationEngine engine(wids);
+        engine.load(QUrl(QStringLiteral("qrc:/srv.qml")));
+        //if (engine.rootObjects().isEmpty()) return -1;
+        //engine.rootContext()->setContextProperty("win", &cClass);
+*/
         wnd.show();
         srv.exec();
     }

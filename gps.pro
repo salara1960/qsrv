@@ -5,12 +5,14 @@
 #-------------------------------------------------
 
 QT += core gui widgets network sql
-QT += location qml quick quickwidgets
+# webview
+QT += location positioning qml quick quickwidgets
 
+CONFIG += gnu++14
+DEFINES -= QT_DEPRECATED_WARNINGS
 
 TARGET = gps
 TEMPLATE = app
-
 
 SOURCES += main.cpp\
         srv.cpp

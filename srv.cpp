@@ -43,16 +43,18 @@
 //char const *vers = "3.2";//15.01.2019 - major changes : make map with qml
 //char const *vers = "3.3";//16.01.2019 - minor changes : make map with qml (remove unused object)
 //char const *vers = "3.4";//18.01.2019 - minor changes : used new-style cast
-char const *vers = "3.5";//21.01.2019 - minor changes : add on map marker item
-
+//char const *vers = "3.5";//21.01.2019 - minor changes : add on map marker item
+//char const *vers = "3.5.1";//21.01.2019 - minor changes : add marker item on the map, any changes...
+//char const *vers = "3.6";//23.01.2019 - major changes
+//char const *vers = "3.6.1";//24.01.2019 - minor changes
+//char const *vers = "3.7.1";//25.01.2019 - major changes : add CordClass
+char const *vers = "3.8";//27.01.2019 - major changes in QML and CordClass (location changed by QML timer)
 
 
 const QString title = "GPS device (Teltonika) server application";
 const QString LogFileName = "logs.txt";
 uint8_t dbg = 2;
 const int time_wait_answer = 10000;//10 sec.
-
-s_cord cord = {54.699680 , 20.514001};
 
 int srv_port = 0;
 QString sdnm = "";
@@ -198,6 +200,9 @@ const uint16_t crc16tab[] = // CRC lookup table [B]polynomial 0xA001[/B]
     0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040
 };
 #define UPDC16(ch, crc) (crc16tab[((crc) ^ (ch)) & 0xff] ^ ((crc) >> 8))
+
+
+QQuickWidget *wids = nullptr;
 
 //-----------------------------------------------------------------------
 void parse_param_start(char *param)
@@ -1345,16 +1350,20 @@ QString qstx, qstz;
 MainWindow::TheError::TheError(int err) { code = err; }//error class descriptor
 
 //----------------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------------
+
+//----------------------------------------------------------------------------------------------------------------------------
 MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
+
     ui->setupUi(this);
+
     this->setFixedSize(this->size());
     ui->l_ignition->setVisible(false);//hide ignition
 
     this->setWindowOpacity(0.95);//set the level of transparency
 
     port = p;
-    wid = nullptr;
     tcpServer = nullptr;
     query = nullptr;
     db = nullptr;
@@ -1362,6 +1371,7 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     client = auth = false;
     imei.clear(); CliUrl.clear();
     seq_number = cmd_seq_number = 0;
+    movie = nullptr;
 
     fd = -1;
     tmr_ack = 0;
@@ -1372,8 +1382,10 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     memset(&pins, 0, sizeof(s_pins));
     tmr_sec = startTimer(1000);// 1 sec.
 
+    wids = ui->qWidget;
+
     movie = new QMovie(car);
-    ui->avto->setMovie(movie);
+    if (movie) ui->avto->setMovie(movie);
 
     thecar = {0, "", "", 0};
     db_name = dnm;  
@@ -1397,17 +1409,29 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
         throw TheError(MyError);
     }
 
-    latitude = cord.latitude;//54.699680;
-    longitude = cord.longitude;//20.514001;
-    qmlRegisterType<MainWindow>("CppToQml", 1, 0, "CNameQml");
-    wid = new QQuickWidget(QUrl(QStringLiteral("qrc:/srv.qml")), ui->qWidget);
-    //if (wid) wid->hide();
+
+    wid = nullptr;
+    Coro = nullptr;
+    RootObj = nullptr;
+
+    latitude  = cord.latitude  = 0.0;//54.699689;
+    longitude = cord.longitude = 0.0;//20.514001;
+
+    qmlRegisterType<CordClass>("CppToQml", 1, 0, "TheClass");
+
+    wid = new QQuickWidget(QUrl(QStringLiteral("qrc:/srv.qml")), wids);
+    if (wid) {
+        Coro = new CordClass(wid, latitude, longitude);
+        wid->rootContext()->setContextProperty("wini", Coro);
+    }
 
 }
 //-----------------------------------------------------------------------
 MainWindow::~MainWindow()
 {
-    if (wid) delete wid;
+
+    if (Coro) delete Coro;
+    if (wid) delete wid;    
 
     if (query) {
         query->clear();
@@ -1420,25 +1444,12 @@ MainWindow::~MainWindow()
     killTimer(tmr_sec);
     if (tmr_ack) killTimer(tmr_ack);
     this->disconnect();
-    delete movie;
+    if (movie) delete movie;
     delete ui;
 }
 //==========================================================================
-double MainWindow::lat() const
-{
-    return latitude;
-}
 //
-void MainWindow::setlat(double newVal)
-{
-//#pragma clang diagnostic ignored "-Wfloat-equal"
-    if ((newVal > latitude) || (newVal < latitude)) {
-        latitude = newVal;
-        emit latChanged(latitude);
-    }
-//#pragma clang diagnostic pop
-}
-//
+//==========================================================================
 void MainWindow::ShowMap()
 {
     if (wid) wid->show();
@@ -1448,7 +1459,7 @@ void MainWindow::HideMap()
 {
     if (wid) wid->hide();
 }
-//==========================================================================
+//--------------------------------------------------------------------------
 void MainWindow::PrnTextInfo(QString st)
 {
     ui->textinfo->append(st);
@@ -1522,10 +1533,10 @@ void MainWindow::UpdatePins()
     ui->l_ignition->setVisible(static_cast<bool>(pins.din1));
     if (pins.msensor) {
         ui->avto->setVisible(true);
-        movie->start();
+        if (movie) movie->start();
      } else {
         ui->avto->setVisible(false);
-        movie->stop();
+        if (movie) movie->stop();
     }
 
     if (pins.din1) ui->din1->setCheckState(Qt::Checked); else ui->din1->setCheckState(Qt::Unchecked);
@@ -1549,7 +1560,7 @@ void MainWindow::ShowHideData(bool flg)
     else {
         ui->l_ignition->setVisible(flg);
         ui->avto->setVisible(false);
-        movie->stop();
+        if (movie) movie->stop();
     }
     ui->l_imei->setEnabled(flg);     ui->imei->setEnabled(flg);
     ui->l_dev_name->setEnabled(flg); ui->dev_name->setEnabled(flg);
@@ -1633,7 +1644,7 @@ void MainWindow::on_stoping_clicked()
         ui->sending->setEnabled(false);
         ShowHideData(false);
 
-        movie->stop();
+        if (movie) movie->stop();
         ui->avto->setVisible(false);
 
         /**/
@@ -1844,16 +1855,20 @@ void MainWindow::slotRdyPack(int ilen)
                     QString qstx = QJsonDocument(*jobj).toJson(QJsonDocument::Compact) + "\n";
                     time_t ict = QDateTime::currentDateTime().toTime_t();
                     struct tm *ct = localtime(&ict);
-                    QString dt; dt.sprintf("%02d:%02d:%02d  ", ct->tm_hour, ct->tm_min, ct->tm_sec);
+                    QString dt;
+                    dt.sprintf("%02d:%02d:%02d  ", ct->tm_hour, ct->tm_min, ct->tm_sec);
                     PrnTextInfo(dt + qstx);
                     LogSave(nullptr, qstx, 0);
                     codec_id = 0;
                     if ((latitude < cord.latitude) || (latitude > cord.latitude) || (longitude < cord.longitude) || (longitude > cord.longitude)) {
-                        dt.sprintf("%02d:%02d:%02d  coordinate: %f,%f - %f,%f\n", ct->tm_hour, ct->tm_min, ct->tm_sec, latitude, longitude, cord.latitude, cord.longitude);
+                        dt.sprintf("%02d:%02d:%02d  coordinate: %f,%f - %f,%f\n",
+                                   ct->tm_hour, ct->tm_min, ct->tm_sec,
+                                   latitude, longitude, cord.latitude, cord.longitude);
                         PrnTextInfo(dt);
                         LogSave(nullptr, dt, 0);
+                        latitude = cord.latitude; longitude = cord.longitude;
+                        Coro->set_pos(latitude, longitude);
                     }
-                    setlat(cord.latitude);
                 }
             } else LogSave(__func__, "Error codec_id = " + QString::number(codec_id, 10), 1);
 

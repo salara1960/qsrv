@@ -11,6 +11,7 @@
 
 #include <QApplication>
 #include <QMainWindow>
+#include <QDebug>
 #include <QtNetwork>
 #include <QTcpSocket>
 #include <QTcpServer>
@@ -29,12 +30,28 @@
 #include <QSqlError>
 #include <QListWidget>
 
+//#include <QtWebView>
+
 #include <QtQuickWidgets/QQuickWidget>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickView>
+#include <QtQml>
+
+#include <QGeoPositionInfoSource>
+
+#include <QGeoAddress>
+#include <QGeoCodingManager>
+#include <QGeoCoordinate>
+#include <QGeoLocation>
+#include <QGeoServiceProvider>
+#include <QGeoCodingManagerEngine>
+
 
 //********************************************************************************
+
+#define SET_DEBUG
+
 #define size_imei 15
 #define size_num 16
 #define max_buf 4096
@@ -174,7 +191,7 @@ extern const char *mk_table;
 extern const char *cmds0[];
 extern const char *cmds1[];
 
-extern s_cord cord;
+extern QQuickWidget *wids;
 
 extern void parse_param_start(char *param);
 
@@ -185,18 +202,92 @@ extern void parse_param_start(char *param);
 namespace Ui {
     class MainWindow;
 }
+//********************************************************************************
+//********************************************************************************
+//********************************************************************************
+class CordClass : public QObject
+{
+    Q_OBJECT
+//    Q_PROPERTY(double lat READ get_lat WRITE set_lat NOTIFY lat_Changed)
+//    Q_PROPERTY(double lon READ lon WRITE set_lon NOTIFY lon_Changed)
+public:
+    explicit CordClass(QObject *parent = nullptr, double la = 0.0, double lo = 0.0)
+    {
+        m_lat = la; m_lon = lo;
+    }
+    ~CordClass() {}
+    Q_INVOKABLE double get_lat() const { return m_lat; }
+    Q_INVOKABLE double get_lon() const { return m_lon; }
+/*
+    void set_lat(double la)
+    {
+        m_lat = la;
+        QString lin; lin.sprintf("New latitude : %.6f", m_lat);
+        qDebug() << lin;
+        //emit lat_Changed(m_lat);
+    }
+    void set_lon(double lo)
+    {
+        m_lon = lo;
+        QString lin; lin.sprintf("New longitude : %.6f", m_lon);
+        qDebug() << lin;
+        //emit lon_Changed(m_lon);
+    }
+*/
+    void set_pos(double la, double lo)
+    {
+        m_lat = la;
+        m_lon = lo;
+        QString lin; lin.sprintf("New location : %.6f , %.6f", m_lat, m_lon);
+        qDebug() << lin;
+    }
+/*
+signals:
+    void lat_Changed(double la);
+    void lon_Changed(double lo);
+*/
+private:
+    double m_lat;
+    double m_lon;
+};
+//-----------------------------------------------------------
+/*
+CordClass::CordClass(QObject *parent):QObject(parent)
+{
+    m_lat = 0.0;
+}
+//-----------------------------------------------------------
+CordClass::~CordClass()
+{
+}
+//-----------------------------------------------------------
+double CordClass::get_lat() const
+{
+//    QObject *lt = this->findChild<QObject *>("lati");
+//    lt->setProperty("lati", m_lat);
+    return m_lat;
+}
+//-----------------------------------------------------------
+void CordClass::set_lat(const double la)
+{
+    m_lat = la;
+    QString lin; lin.sprintf("New latitude : %f", m_lat); qDebug() << lin;
 
+    //if (m_lat != newVal)
+        emit lat_Changed(m_lat);
+}
+*/
+//********************************************************************************
+//********************************************************************************
 //********************************************************************************
 
 class QTcpServer;
 
-
+//********************************************************************************
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
-    //Q_PROPERTY(double lat MEMBER latitude READ lat WRITE setlat NOTIFY latChanged)
-    Q_PROPERTY(double lat READ lat WRITE setlat NOTIFY latChanged)
 
 public:
 
@@ -209,8 +300,6 @@ public:
     explicit MainWindow(QWidget *parent = nullptr, int p = 9090, QString *dnm = nullptr);
     ~MainWindow();
     void timerEvent(QTimerEvent *event);
-
-    Q_INVOKABLE double lat() const;
 
 public slots:
     void PrnTextInfo(QString);
@@ -226,8 +315,6 @@ public slots:
     void slotErrorClient(QAbstractSocket::SocketError);
     void clearParam(int);
     void UpdatePins();
-
-    void setlat(double newVal);
 
 private slots:
     void ShowHideData(bool);
@@ -249,8 +336,6 @@ signals:
     void sigRdyPack(int);
     void sigSending();
     void sigWaitDone();
-
-    void latChanged(double lat);
 
 private:
     bool client, auth, rdy;
@@ -275,6 +360,18 @@ private:
 
     QQuickWidget *wid;
     double latitude, longitude;
+    s_cord cord;
+
+/*
+    QString srv_prov;
+    QGeoServiceProvider *sprov;
+    QGeoCodingManager *man;
+    QQmlEngine *eng;
+    QGeoLocation geoloc;
+*/
+    CordClass *Coro;
+
+    QObject *RootObj;
 
 };
 

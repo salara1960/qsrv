@@ -6,3 +6,7 @@ Gps tracker (Teltonika device), server qt_application
 - cars.s3db - database (sqlite3) with a table that includes device characteristics
 - two mode working support : parking and trip (with indication mode via movie)
 ```
+
+News : Add map window with device marker in GUI frontend.
+
+
