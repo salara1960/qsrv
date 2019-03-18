@@ -30,8 +30,6 @@
 #include <QSqlError>
 #include <QListWidget>
 
-//#include <QtWebView>
-
 #include <QtQuickWidgets/QQuickWidget>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -167,11 +165,11 @@ typedef struct
     uint8_t type;
 } s_car;
 
-struct s_cord
+typedef struct
 {
     double latitude;
     double longitude;
-};
+} s_cord;
 //********************************************************************************
 
 extern int srv_port;
@@ -193,6 +191,8 @@ extern const char *cmds1[];
 
 extern QQuickWidget *wids;
 
+//extern s_cord cord;
+
 extern void parse_param_start(char *param);
 
 //********************************************************************************
@@ -208,75 +208,43 @@ namespace Ui {
 class CordClass : public QObject
 {
     Q_OBJECT
-//    Q_PROPERTY(double lat READ get_lat WRITE set_lat NOTIFY lat_Changed)
-//    Q_PROPERTY(double lon READ lon WRITE set_lon NOTIFY lon_Changed)
 public:
-    explicit CordClass(QObject *parent = nullptr, double la = 0.0, double lo = 0.0)
+    explicit CordClass(QObject *parent = nullptr, s_cord *loc = nullptr, QRect r = {0,0,0,0}) : QObject(parent)
     {
-        m_lat = la; m_lon = lo;
+        if (loc) {
+            m_lat = loc->latitude;
+            m_lon = loc->longitude;
+        }
+        if (parent) {
+            w = r.width();
+            h = r.height();
+        }
     }
     ~CordClass() {}
+
+    Q_INVOKABLE int get_w() const { return w; }
+    Q_INVOKABLE int get_h() const { return h; }
+
     Q_INVOKABLE double get_lat() const { return m_lat; }
     Q_INVOKABLE double get_lon() const { return m_lon; }
-/*
-    void set_lat(double la)
-    {
-        m_lat = la;
-        QString lin; lin.sprintf("New latitude : %.6f", m_lat);
-        qDebug() << lin;
-        //emit lat_Changed(m_lat);
-    }
-    void set_lon(double lo)
-    {
-        m_lon = lo;
-        QString lin; lin.sprintf("New longitude : %.6f", m_lon);
-        qDebug() << lin;
-        //emit lon_Changed(m_lon);
-    }
-*/
-    void set_pos(double la, double lo)
-    {
-        m_lat = la;
-        m_lon = lo;
-        QString lin; lin.sprintf("New location : %.6f , %.6f", m_lat, m_lon);
-        qDebug() << lin;
-    }
-/*
-signals:
-    void lat_Changed(double la);
-    void lon_Changed(double lo);
-*/
-private:
-    double m_lat;
-    double m_lon;
-};
-//-----------------------------------------------------------
-/*
-CordClass::CordClass(QObject *parent):QObject(parent)
-{
-    m_lat = 0.0;
-}
-//-----------------------------------------------------------
-CordClass::~CordClass()
-{
-}
-//-----------------------------------------------------------
-double CordClass::get_lat() const
-{
-//    QObject *lt = this->findChild<QObject *>("lati");
-//    lt->setProperty("lati", m_lat);
-    return m_lat;
-}
-//-----------------------------------------------------------
-void CordClass::set_lat(const double la)
-{
-    m_lat = la;
-    QString lin; lin.sprintf("New latitude : %f", m_lat); qDebug() << lin;
 
-    //if (m_lat != newVal)
-        emit lat_Changed(m_lat);
-}
-*/
+    void set_pos(s_cord *loc)
+    {
+        m_lat = loc->latitude;
+        m_lon = loc->longitude;
+        QString dts(QDateTime::currentDateTime().toString("hh:mm:ss.zzz"));
+        QString lin;
+        dts += lin.sprintf(" New location : %.6g , %.6g", m_lat, m_lon);
+#ifdef SET_DEBUG
+        qDebug() << dts;
+#endif
+    }
+
+private:
+    double m_lat = 0.0, m_lon = 0.0;
+    int w = 800, h = 260;
+};
+
 //********************************************************************************
 //********************************************************************************
 //********************************************************************************
@@ -348,7 +316,7 @@ private:
     QString CliUrl;
     s_pins pins;
     Ui::MainWindow *ui;
-    QTcpServer *tcpServer;    
+    QTcpServer *tcpServer;
     QMap <int, QTcpSocket *> SClients;
     QMovie *movie;
     QSqlDatabase *db;
@@ -361,16 +329,7 @@ private:
     QQuickWidget *wid;
     double latitude, longitude;
     s_cord cord;
-
-/*
-    QString srv_prov;
-    QGeoServiceProvider *sprov;
-    QGeoCodingManager *man;
-    QQmlEngine *eng;
-    QGeoLocation geoloc;
-*/
     CordClass *Coro;
-
     QObject *RootObj;
 
 };

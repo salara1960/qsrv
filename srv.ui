@@ -1104,7 +1104,7 @@ background-color:rgb(226, 226, 226)}</string>
       <property name="minimumSize">
        <size>
         <width>880</width>
-        <height>260</height>
+        <height>290</height>
        </size>
       </property>
       <property name="resizeMode">

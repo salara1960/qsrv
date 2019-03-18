@@ -48,7 +48,9 @@
 //char const *vers = "3.6";//23.01.2019 - major changes
 //char const *vers = "3.6.1";//24.01.2019 - minor changes
 //char const *vers = "3.7.1";//25.01.2019 - major changes : add CordClass
-char const *vers = "3.8";//27.01.2019 - major changes in QML and CordClass (location changed by QML timer)
+//char const *vers = "3.8";//27.01.2019 - major changes in QML and CordClass (location changed by QML timer)
+//char const *vers = "3.8.1";//28.01.2019 - minor changes in CordClass and QML (get parent_width and parent_height from C++ to QML)
+char const *vers = "3.8.2";//18.03.2019 - minor changes
 
 
 const QString title = "GPS device (Teltonika) server application";
@@ -298,7 +300,6 @@ const char *cmu = nullptr;
 
     alen = sizeof(s_avl_cmd) + ((len + 5) * cnt) + 5;
 
-    //tmp = (uint8_t *)calloc(1, alen + 1);
     tmp = reinterpret_cast<uint8_t *>(calloc(1, alen + 1));
     if (tmp) {
         //hdr = (s_avl_cmd *)tmp;
@@ -969,7 +970,7 @@ uint32_t dword = 0;
 uint8_t byte;
 uint16_t word;
 uint64_t dint8;
-float latit, longit, rdat;
+float latit = 0.0, longit = 0.0, rdat;
 double dlat = 0.0, dlon = 0.0;
 QJsonObject *jpack = nullptr, *jarr_io = nullptr, *jans = nullptr, *jsta = nullptr;
 QJsonArray *jarr = nullptr;
@@ -1150,8 +1151,8 @@ QString qstx, qstz;
                 else if (g_bin->angle == 225) sprintf(sta," South-West");
                 else if (g_bin->angle == 135) sprintf(sta," South-East");
                 sprintf(stx, "GPS:\n%s Latitude:\t%d%c%d\"%d'\t%f\n%s Longitude:\t%d%c%d\"%d'\t%f\nAltitude:\t%d meters\nAngel:\t\t%d%c\t%s\nSattelites:\t%d\nSpeed:\t\t%d km/h\n",
-                             lat_name[shi], g_bin->latitude_grad, gradus, g_bin->latitude_min, g_bin->latitude_sec, static_cast<double>(latit),
-                             lon_name[dol], g_bin->longitude_grad, gradus, g_bin->longitude_min, g_bin->longitude_sec, static_cast<double>(longit),
+                             lat_name[shi], g_bin->latitude_grad, gradus, g_bin->latitude_min, g_bin->latitude_sec, latit,
+                             lon_name[dol], g_bin->longitude_grad, gradus, g_bin->longitude_min, g_bin->longitude_sec, longit,
                              g_bin->altitude,
                              g_bin->angle, gradus, sta,
                              g_bin->sattelites,
@@ -1304,8 +1305,6 @@ QString qstx, qstz;
                 if (uk >= _end) break;
             }
 
-            //UpdatePins();
-
             if (dbg >= 2) LogSave(nullptr, "\n", 0);
             //--------------------   ADD STAT FLAGS   -----------------------------
             if (jsta) { delete jsta; jsta = nullptr; }
@@ -1350,7 +1349,6 @@ QString qstx, qstz;
 MainWindow::TheError::TheError(int err) { code = err; }//error class descriptor
 
 //----------------------------------------------------------------------------------------------------------------------------
-//----------------------------------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------------------------------
 MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(parent), ui(new Ui::MainWindow)
@@ -1388,7 +1386,7 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     if (movie) ui->avto->setMovie(movie);
 
     thecar = {0, "", "", 0};
-    db_name = dnm;  
+    db_name = dnm;
     sql_err.setType(QSqlError::NoError);
     query = nullptr;
     openok = good = false;
@@ -1417,21 +1415,18 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     latitude  = cord.latitude  = 0.0;//54.699689;
     longitude = cord.longitude = 0.0;//20.514001;
 
-    qmlRegisterType<CordClass>("CppToQml", 1, 0, "TheClass");
-
     wid = new QQuickWidget(QUrl(QStringLiteral("qrc:/srv.qml")), wids);
     if (wid) {
-        Coro = new CordClass(wid, latitude, longitude);
-        wid->rootContext()->setContextProperty("wini", Coro);
+        Coro = new CordClass(wid, &cord, wids->geometry());
+        if (Coro) wid->rootContext()->setContextProperty("wini", Coro);
     }
 
 }
 //-----------------------------------------------------------------------
 MainWindow::~MainWindow()
 {
-
     if (Coro) delete Coro;
-    if (wid) delete wid;    
+    if (wid) delete wid;
 
     if (query) {
         query->clear();
@@ -1452,12 +1447,16 @@ MainWindow::~MainWindow()
 //==========================================================================
 void MainWindow::ShowMap()
 {
-    if (wid) wid->show();
+    if (wid) {
+        wid->show();
+    }
 }
 //
 void MainWindow::HideMap()
 {
-    if (wid) wid->hide();
+    if (wid) {
+        wid->hide();
+    }
 }
 //--------------------------------------------------------------------------
 void MainWindow::PrnTextInfo(QString st)
@@ -1619,9 +1618,7 @@ void MainWindow::on_starting_clicked()
     ui->sending->setEnabled(false);
     memset(&pins, 0, sizeof(s_pins));
 
-/**/
     ShowMap();
-/**/
 
 }
 //-----------------------------------------------------------------------
@@ -1647,9 +1644,7 @@ void MainWindow::on_stoping_clicked()
         if (movie) movie->stop();
         ui->avto->setVisible(false);
 
-        /**/
-            HideMap();
-        /**/
+        HideMap();
     }
 }
 //-----------------------------------------------------------------------
@@ -1682,9 +1677,7 @@ void MainWindow::newuser()
             thecar.sim   = "";
             thecar.type  = 0;
 
-            /**/
-                ShowMap();
-            /**/
+            ShowMap();
 
         } else {
             stx.append("New client '" + CliUrl + "' online, socket " + QString::number(fd, 10) + ", but client already present !\n");
@@ -1861,13 +1854,15 @@ void MainWindow::slotRdyPack(int ilen)
                     LogSave(nullptr, qstx, 0);
                     codec_id = 0;
                     if ((latitude < cord.latitude) || (latitude > cord.latitude) || (longitude < cord.longitude) || (longitude > cord.longitude)) {
-                        dt.sprintf("%02d:%02d:%02d  coordinate: %f,%f - %f,%f\n",
+                        dt.sprintf("%02d:%02d:%02d  coordinate: %.6f,.6%f - %.6f,%.6f\n",
                                    ct->tm_hour, ct->tm_min, ct->tm_sec,
-                                   latitude, longitude, cord.latitude, cord.longitude);
+                                   latitude, longitude,
+                                   cord.latitude, cord.longitude);
                         PrnTextInfo(dt);
                         LogSave(nullptr, dt, 0);
+
                         latitude = cord.latitude; longitude = cord.longitude;
-                        Coro->set_pos(latitude, longitude);
+                        if (Coro) Coro->set_pos(&cord);
                     }
                 }
             } else LogSave(__func__, "Error codec_id = " + QString::number(codec_id, 10), 1);
@@ -2069,15 +2064,6 @@ void MainWindow::timerEvent(QTimerEvent *event)
                     ctimka->tm_min,
                     ctimka->tm_sec);
         setWindowTitle(title + " ver. " + vers + dt);
-        /*
-        cfirst++;
-        if (first) {
-            if (cfirst == 2) {
-                first = false;
-                emit sigMkMap();
-            }
-        }
-        */
     }
 }
 //-----------------------------------------------------------------------
