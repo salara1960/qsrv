@@ -50,10 +50,11 @@
 //char const *vers = "3.7.1";//25.01.2019 - major changes : add CordClass
 //char const *vers = "3.8";//27.01.2019 - major changes in QML and CordClass (location changed by QML timer)
 //char const *vers = "3.8.1";//28.01.2019 - minor changes in CordClass and QML (get parent_width and parent_height from C++ to QML)
-char const *vers = "3.8.2";//18.03.2019 - minor changes
+//char const *vers = "3.8.2";//18.03.2019 - minor changes
+char const *vers = "3.8.3";//25.03.2019 - minor changes++
 
 
-const QString title = "GPS device (Teltonika) server application";
+const QString title = "GPS server application (Teltonika device's)";
 const QString LogFileName = "logs.txt";
 uint8_t dbg = 2;
 const int time_wait_answer = 10000;//10 sec.
@@ -62,11 +63,11 @@ int srv_port = 0;
 QString sdnm = "";
 
 char gradus = '^';
-const char *prio_name[] = {"Low","High","Panic","Security"};
+const char *prio_name[] = {"Low", "High", "Panic", "Security"};
 const char *unknown = "Unknown";
 const char *lat_name[] = {"North","South"};     // широта Latitude
-const char *lon_name[] = {"East","West"};       // долгота Longitude
-const char *net_type_name[] = {"3G","2G"};
+const char *lon_name[] = {"East", "West"};      // долгота Longitude
+const char *net_type_name[] = {"3G", "2G"};
 
 const QString srv_command = "command";
 const QString srv_command_param = "param";
@@ -302,7 +303,6 @@ const char *cmu = nullptr;
 
     tmp = reinterpret_cast<uint8_t *>(calloc(1, alen + 1));
     if (tmp) {
-        //hdr = (s_avl_cmd *)tmp;
         hdr = reinterpret_cast < s_avl_cmd * > ( tmp );
         hdr->codec_id = CodecID12;//0x0c;
         hdr->cmd_cnt = cnt;
@@ -351,8 +351,8 @@ char *MainWindow::io_name(uint8_t id, char *st, uint8_t dtype)
 {
 
   switch (dtype) {
-    case DEV_FM6320://3://FM6320
-    case DEV_FMB630://2://FMB630
+    case DEV_FM6320:
+    case DEV_FMB630:
         switch (id) {
             case 1  : sprintf(st,"DIN1"); break;
             case 2  : sprintf(st,"DIN2"); break;
@@ -538,7 +538,7 @@ char *MainWindow::io_name(uint8_t id, char *st, uint8_t dtype)
                 default : sprintf(st,"%d",id);
         }
     break;
-    case DEV_FM5300://1://FM5300
+    case DEV_FM5300:
         switch (id) {
             case 1  : sprintf(st,"DIN1"); break;//1 Digital Input Status 1  1 Logic: 0 / 1
             case 2  : sprintf(st,"DIN2"); break;//2 Digital Input Status 2  1 Logic: 0 / 1
@@ -636,7 +636,7 @@ char *MainWindow::io_name(uint8_t id, char *st, uint8_t dtype)
                 default : sprintf(st,"%d",id);
         }
     break;
-    case DEV_FM1110://0://FM1110
+    case DEV_FM1110:
         switch (id) {
             case 1  : sprintf(st,"DIN1"); break;
             case 2  : sprintf(st,"DIN2"); break;
@@ -903,7 +903,7 @@ char *uki = nullptr, *uks = nullptr, *uke = nullptr, *ukend = nullptr;
                 }
             }
         break;
-        case 1://"DOUTS are set to: 1000 TMOs are: 0 0 0 0"
+        case 1:
         case 2:
             uks = strstr(st, form);
             if (uks) {
@@ -1004,8 +1004,8 @@ QString qstx, qstz;
     memcpy(st, lin, dline&0x7fffffff);
     uk = &st[0];
 
-    h_bin = reinterpret_cast<s_hdr_pack_bin *>(st);//for codec.id=8
-    h_bin_ack = reinterpret_cast<s_hdr_bin_ack *>(st);//for codec.id=12
+    h_bin = reinterpret_cast<s_hdr_pack_bin *>(st);    //for codec.id=8
+    h_bin_ack = reinterpret_cast<s_hdr_bin_ack *>(st); //for codec.id=12
 
     if (dbg >= 2) {
         memset(sta, 0, sizeof(sta));
@@ -1110,15 +1110,15 @@ QString qstx, qstz;
             }
             jpack = new QJsonObject();
             jpack->insert("TimeStamp", QJsonValue(static_cast<qint32>(tim)));
-            jpack->insert("Priority", QJsonValue(reinterpret_cast<const char *>(ptr)));
+            jpack->insert("Priority",  QJsonValue(reinterpret_cast<const char *>(ptr)));
             //-------------------------------   GPS  ------------------------------------------------------
             memset(reinterpret_cast<uint8_t *>(g_bin), 0, sizeof(s_gps_pack_bin));
-            g_bin->latitude = ntohl(p_bin->latitude);   latit = g_bin->latitude;   latit /= 10000000;
-            g_bin->longitude = ntohl(p_bin->longitude); longit = g_bin->longitude; longit /= 10000000;
-            g_bin->altitude = static_cast<short>(ntohs(static_cast<uint16_t>(p_bin->altitude)));
-            g_bin->angle = ntohs(p_bin->angle);
+            g_bin->latitude   = ntohl(p_bin->latitude);  latit  = g_bin->latitude;   latit /= 10000000;
+            g_bin->longitude  = ntohl(p_bin->longitude); longit = g_bin->longitude; longit /= 10000000;
+            g_bin->altitude   = static_cast<short>(ntohs(static_cast<uint16_t>(p_bin->altitude)));
+            g_bin->angle      = ntohs(p_bin->angle);
             g_bin->sattelites = p_bin->sattelites;
-            g_bin->speed = ntohs(p_bin->speed);
+            g_bin->speed      = ntohs(p_bin->speed);
 
             if (g_bin->latitude & 0x80000000) shi = 1;     // южная широта
                                          else shi = 0;     // северная широта
@@ -1209,11 +1209,13 @@ QString qstx, qstz;
                                 break;
                                 case 2://DIN2 - Door
                                     pins.din2 = byte;
-                                    door = ~byte; door &= 1;
+                                    door = ~byte;
+                                    door &= 1;
                                 break;
                                 case 3://DIN3 - Trunk
                                     pins.din3 = byte;
-                                    trunk = ~byte; trunk &= 1;
+                                    trunk = ~byte;
+                                    trunk &= 1;
                                 break;
                                 case 4://DIN4 - Skp
                                     pins.din4 = byte;
@@ -1412,8 +1414,8 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
     Coro = nullptr;
     RootObj = nullptr;
 
-    latitude  = cord.latitude  = 0.0;//54.699689;
-    longitude = cord.longitude = 0.0;//20.514001;
+    latitude  = cord.latitude  = 0.0;
+    longitude = cord.longitude = 0.0;
 
     wid = new QQuickWidget(QUrl(QStringLiteral("qrc:/srv.qml")), wids);
     if (wid) {
@@ -1488,9 +1490,9 @@ bool ret = false;
             while (query->next()) {
                 ix++;
                 tmp.index = query->value(0).toString().toInt(&ok, 10);
-                tmp.imei = query->value(1).toString();
-                tmp.sim = query->value(2).toString();
-                tmp.type = (query->value(3).toString().toInt(&ok, 10)) & 0xff;
+                tmp.imei  = query->value(1).toString();
+                tmp.sim   = query->value(2).toString();
+                tmp.type  = (query->value(3).toString().toInt(&ok, 10)) & 0xff;
                 if (tmp.type > DEV_UNKNOWN) tmp.type = DEV_UNKNOWN;
                 QString stx = QString::number(ix, 10) + " : " +
                         QString::number(tmp.index, 10) + " | " +
@@ -1501,9 +1503,9 @@ bool ret = false;
                 if (imei.length()) {
                     if (imei == tmp.imei) {
                         car->index = tmp.index;
-                        car->imei = tmp.imei;
-                        car->sim = tmp.sim;
-                        car->type = tmp.type;
+                        car->imei  = tmp.imei;
+                        car->sim   = tmp.sim;
+                        car->type  = tmp.type;
                         statusBar()->clearMessage(); statusBar()->showMessage(stx);
                         ret = true;
                         break;
@@ -1585,8 +1587,11 @@ void MainWindow::ShowHideData(bool flg)
 //-----------------------------------------------------------------------
 void MainWindow::clearParam(int len)
 {
-    memset(to_cli, 0, sizeof(to_cli));     txdata = 0;
-    memset(from_cli, 0, sizeof(from_cli)); rxdata = len; lenrecv = 0;
+    memset(to_cli,   0, sizeof(to_cli));
+    memset(from_cli, 0, sizeof(from_cli));
+    rxdata = len;
+    txdata = 0;
+    lenrecv = 0;
 }
 //-----------------------------------------------------------------------
 void MainWindow::on_starting_clicked()
@@ -1665,10 +1670,10 @@ void MainWindow::newuser()
             client = true; rdy = false;
             stx.append("New client '" + CliUrl + "' online, socket " + QString::number(fd, 10));//ssock);
             SClients[fd] = cliSocket;
-            connect(SClients[fd], SIGNAL(readyRead()), this, SLOT(slotReadClient()));
-            connect(this, SIGNAL(sigCliDone(QTcpSocket *, int)), this, SLOT(slotCliDone(QTcpSocket *, int)));
+            connect(SClients[fd], SIGNAL(readyRead()),                         this, SLOT(slotReadClient()));
+            connect(this,         SIGNAL(sigCliDone(QTcpSocket *, int)),       this, SLOT(slotCliDone(QTcpSocket *, int)));
             connect(SClients[fd], SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(slotErrorClient(QAbstractSocket::SocketError)));
-            connect(this, SIGNAL(sigRdyPack(int)), this, SLOT(slotRdyPack(int)));
+            connect(this,         SIGNAL(sigRdyPack(int)),                     this, SLOT(slotRdyPack(int)));
             statusBar()->clearMessage(); statusBar()->showMessage(stx);
             ui->sending->setEnabled(true);
             memset(&pins, 0, sizeof(s_pins));
@@ -1706,9 +1711,10 @@ QString stx;
                         ui->imei->setText(imei);
                         to_cli[0] = 0x01; cliSocket->write(to_cli, 1);
                         auth = true;
-                        lenrecv = 0; memset(from_cli, 0, sizeof(from_cli)); rxdata = sizeof(s_avl_hdr);
+                        lenrecv = 0;
+                        memset(from_cli, 0, sizeof(from_cli)); rxdata = sizeof(s_avl_hdr);
                         faza = 1;
-                        ShowHideData(auth);//true
+                        ShowHideData(auth);
                         ui->dev_name->setText(dev_type_name[thecar.type]);
                         stx = "From database `" + *db_name +"` client DevID : " +
                               QString::number(thecar.index, 10) + " | " +
@@ -1787,10 +1793,10 @@ void MainWindow::slotCliDone(QTcpSocket *cli, int prn)
 {
     if (cli->isOpen()) {
         if (prn) {
-                QString stx = "Close client, socket " + QString::number(fd, 10) + ".\n";
-                PrnTextInfo(stx);
-                LogSave(__func__, stx, true);
-                statusBar()->clearMessage(); statusBar()->showMessage(stx);
+            QString stx = "Close client, socket " + QString::number(fd, 10) + ".\n";
+            PrnTextInfo(stx);
+            LogSave(__func__, stx, true);
+            statusBar()->clearMessage(); statusBar()->showMessage(stx);
         }
         disconnect(cli);
         cli->close();
@@ -1822,10 +1828,10 @@ void MainWindow::slotRdyPack(int ilen)
         QJsonObject *jobj = new QJsonObject();
         if (jobj) {
             bool yes = true;
-            jobj->insert("DevName", QJsonValue(dev_type_name[thecar.type]));
-            jobj->insert("DevID",   QJsonValue(imei));
-            jobj->insert("ServerTime",QJsonValue(static_cast<qint32>(time(nullptr))));
-            jobj->insert("FromAddr", QJsonValue(CliUrl));
+            jobj->insert("DevName",    QJsonValue(dev_type_name[thecar.type]));
+            jobj->insert("DevID",      QJsonValue(imei));
+            jobj->insert("ServerTime", QJsonValue(static_cast<qint32>(time(nullptr))));
+            jobj->insert("FromAddr",   QJsonValue(CliUrl));
             switch (codec_id) {
                 case CodecID8:
                     seq_number++;
@@ -1834,8 +1840,8 @@ void MainWindow::slotRdyPack(int ilen)
                 case CodecID12:
                 case CodecID13:
                     cmd_seq_number++;
-                    jobj->insert("SeqNumber",QJsonValue(cmd_seq_number));
-                    jobj->insert("Command", QJsonValue(cmd_id));
+                    jobj->insert("SeqNumber", QJsonValue(cmd_seq_number));
+                    jobj->insert("Command",   QJsonValue(cmd_id));
                     statusBar()->clearMessage();
                     statusBar()->showMessage("For command " + ui->cmd->text() + " response received");
                     slotWaitDone();//enable next command sending
@@ -1861,7 +1867,8 @@ void MainWindow::slotRdyPack(int ilen)
                         PrnTextInfo(dt);
                         LogSave(nullptr, dt, 0);
 
-                        latitude = cord.latitude; longitude = cord.longitude;
+                        latitude = cord.latitude;
+                        longitude = cord.longitude;
                         if (Coro) Coro->set_pos(&cord);
                     }
                 }
@@ -1916,8 +1923,8 @@ int dtype = thecar.type;
                             } else sprintf(cmd_par+strlen(cmd_par)," 0 0 0 0");
                         }
                     } else {
-                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " %d 0", oc_time);//FM1110//"setdigout Dt 0"
-                                                    else sprintf(cmd_par, " %d 0", relz);//FM1110//"setdigout 10 T 0"
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " %d 0", oc_time);
+                                                    else sprintf(cmd_par, " %d 0", relz);
                     }
                 break;
                 case 2://SET OFF DOUT
@@ -1938,8 +1945,8 @@ int dtype = thecar.type;
                                     else cid = 34;//"SET_OFF 1 0"
                         sprintf(cmd_par, " 1 0");
                     } else {
-                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " 0 %d", oc_time);//FM1110
-                                                    else sprintf(cmd_par, " 0 %d", relz);//FM1110
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " 0 %d", oc_time);
+                                                    else sprintf(cmd_par, " 0 %d", relz);
                     }
                 break;
                 case 4:
@@ -1954,8 +1961,8 @@ int dtype = thecar.type;
                         cid = 33;
                         sprintf(cmd_par, " 2 2");//"SET_ON 2 2"
                     } else {
-                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " %d %d", oc_time, oc_time);//FM1110//"setdigout Dt 0"
-                                                    else sprintf(cmd_par, " %d %d", relz, relz);//FM1110//"setdigout 10 T 0"
+                        if ((relz < 0) || (relz == 255)) sprintf(cmd_par, " %d %d", oc_time, oc_time);
+                                                    else sprintf(cmd_par, " %d %d", relz, relz);
                     }
                 break;
                 case 6:

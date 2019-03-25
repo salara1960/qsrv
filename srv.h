@@ -80,7 +80,7 @@ typedef enum {
 typedef struct
 {
     uint16_t len;              // 2 bytes
-    char imei[size_imei];      // 15 bytes
+    char imei[size_imei];      // 14+1 bytes
 } s_imei;
 typedef struct
 {

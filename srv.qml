@@ -44,9 +44,9 @@ Rectangle {
                         text: lati + "," + loni
                     }
                 }
-                coordinate : QtPositioning.coordinate(lati, loni) // pos.coordinate
+                coordinate : QtPositioning.coordinate(lati, loni)
                 opacity: 1.0
-                anchorPoint: Qt.point( sourceItem.width/2, sourceItem.height/2 )// + 32 )
+                anchorPoint: Qt.point( sourceItem.width/2, sourceItem.height/2 )
         }
 
         anchors.fill: parent
