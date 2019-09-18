@@ -27,6 +27,7 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 
+
 #define buf_size 4096
 #define size_imei 15
 #define im_len 0x0f00
@@ -102,7 +103,6 @@ typedef struct {
     uint32_t counter;
 } s_hdr_rec;
 #pragma pack(pop)
-
 
 //-----------------------------------------------------------------------
 

@@ -333,49 +333,53 @@ int out = 0;
 //---------------------------------------------------------------------------------------------------------------------
 char *TimeNowPrn(char *ts)
 {
-struct tm *ctimka;
-time_t it_ct;
-int i_hour, i_min, i_sec, i_day, i_mes, mil;
-struct timeval tvl;
+    if (!ts) return NULL;
 
-    gettimeofday(&tvl,NULL);
+    struct tm *ctimka;
+    time_t it_ct;
+    struct timeval tvl;
+    gettimeofday(&tvl, NULL);
     it_ct = tvl.tv_sec;
     ctimka = localtime(&it_ct);
-    i_hour = ctimka->tm_hour;   i_min = ctimka->tm_min;         i_sec = ctimka->tm_sec;
-    i_day  = ctimka->tm_mday;   i_mes = ctimka->tm_mon+1;       mil   = (int)(tvl.tv_usec / 1000);
     memset(ts, 0, TIME_STR_LEN);
-    sprintf(ts,"%02d.%02d %02d:%02d:%02d.%03d | ", i_day, i_mes, i_hour, i_min, i_sec, mil);
+    sprintf(ts, "%02d.%02d %02d:%02d:%02d.%03d | ",
+                ctimka->tm_mday, ctimka->tm_mon+1,
+                ctimka->tm_hour, ctimka->tm_min, ctimka->tm_sec, (int)(tvl.tv_usec / 1000));
 
     return ts;
 }
 //---------------------------------------------------------------------------------------------------------------------
 void prints(const char *func, char *st, uint8_t with)
 {
-struct stat sb;
-int res = 0;
-char stx[256] = {0};
+    if (fd_log <= 0) return;
 
-    if (fd_log > 0) {
-        if (with)  res = write(fd_log, TimeNowPrn(time_str), strlen(time_str));
-        if (func) {
-            res = strlen(func); if (res > (sizeof(stx) - 5)) res = sizeof(stx) - 5;
-            sprintf(stx,"["); memcpy(stx + 1, func, res); sprintf(stx+strlen(stx),"] ");
-            res = write(fd_log, stx, strlen(stx));
-        }
-        if (res >= 0) res = write(fd_log, st, strlen(st));
+    int res = 0;
+    char stx[256] = {0};
+    if (with)  res = write(fd_log, TimeNowPrn(time_str), strlen(time_str));
+    if (func) {
+        res = strlen(func);
+        if (res > (sizeof(stx) - 5)) res = sizeof(stx) - 5;
+        sprintf(stx, "["); memcpy(stx + 1, func, res); sprintf(stx+strlen(stx), "] ");
+        res = write(fd_log, stx, strlen(stx));
+    }
+    if (res >= 0) res = write(fd_log, st, strlen(st));
 
-        if (!fstat(fd_log, &sb)) {
-            if (sb.st_size > max_size_log) {
-                close(fd_log); fd_log = -1; unlink(fm_log);                 //remove old file
-                fd_log = open(fm_log, O_WRONLY | O_APPEND | O_CREAT, 0664); //create new file
-            }
+    struct stat sb;
+    if (!fstat(fd_log, &sb)) {
+        if (sb.st_size > max_size_log) {
+            close(fd_log);
+            fd_log = -1;
+            unlink(fm_log);                 //remove old file
+            fd_log = open(fm_log, O_WRONLY | O_APPEND | O_CREAT, 0664); //create new file
         }
     }
 }
 //-----------------------------------------------------------------------
 int read_cfg(const char *fn, uint8_t prn)
 {
-char buf[max_tmp_len] = {0}, chap[max_tmp_len] = {0} ,tmp[max_tmp_len] = {0};
+char buf[max_tmp_len] = {0};
+char chap[max_tmp_len] = {0};
+char tmp[max_tmp_len] = {0};
 int cnt = 0, dl, i, j, ret = -1, delta = 1000, kols = 10;
 s_conf cnf;
 FILE *fp = NULL;
@@ -388,10 +392,10 @@ float latf, lonf;
 
     if ((fp = fopen(fn, "r"))) {
         if (prn) {
-            sprintf(chap,"Configuration file '%s' present:\n", fn);
+            sprintf(chap, "Configuration file '%s' present:\n", fn);
             prints(__func__, chap, 1);
         }
-        memset(buf, 0, max_tmp_len);
+        memset(buf, 0, sizeof(buf));
         memset((uint8_t *)&cnf, 0, sizeof(s_conf));
 
         while (fgets(buf, max_tmp_len - 1, fp) != NULL) {
@@ -412,7 +416,8 @@ float latf, lonf;
                                     if (us) {
                                         cnf.port = (uint16_t)atoi(us + 1);
                                         *us = '\0';
-                                        dl = strlen(chap); if (dl > max_url_len - 1) dl = max_url_len - 1;
+                                        dl = strlen(chap);
+                                        if (dl > max_url_len - 1) dl = max_url_len - 1;
                                         memcpy((char *)cnf.srv, chap, dl); cnt++;//1
                                     }
                                 break;
@@ -474,7 +479,9 @@ float latf, lonf;
                                         }
                                     }
                                     if (md) {
-                                        ones.dir = dir; ones.delta = delta; ones.kols = kols;
+                                        ones.dir   = dir;
+                                        ones.delta = delta;
+                                        ones.kols  = kols;
                                         add_ones(&ones, prn);
                                     }
                                 break;
@@ -484,7 +491,7 @@ float latf, lonf;
                     //-----------------------------------------
                 }//if (buf[0] != ';')
             }//if (dl>5)
-            memset(buf, 0, max_tmp_len);
+            memset(buf, 0, sizeof(buf));
         }//while
         fclose(fp);
     }
@@ -497,7 +504,7 @@ float latf, lonf;
         pthread_mutex_unlock(&conf_mutex);
     } else {
         if (prn) {
-            sprintf(chap,"[%s] Error configuration file '%s'\n", __func__, fn);
+            sprintf(chap, "[%s] Error configuration file '%s'\n", __func__, fn);
             prints(__func__, chap, 1);
         }
     }
@@ -564,167 +571,167 @@ static uint8_t cdut = 3;
         if (wmode == 1) {
 
             if (get_ones(scena_index, &one, 1)) {
-		scena_kols++;
-		switch ((int)one.dir) {
-			case 0://Park:10
-			    move_flag = 0;
-			    send_period = sp_park;
-			    //mirs.gsm.angle = 0;
-			    mirs.gsm.speed = mirs.io2.val_speed = 0;
-			    scena_kols = 1;
-			    mirs.io1.val_din2 = 1;//двери закрыты
-			    mirs.io1.val_din3 = 1;//DIN3 - Trunk : 0-откр.  1-закр.
-			    mirs.io1.val_din4 = 1;//skp - парковка
-			    bit16 = 1200; mirs.io2.val_ain3 = htons(bit16);//AIN3 - hood (Капот) : if (val < 1000) hood = 1;//открыт else hood = 0;//закрыт
-			    bit16 = 326;  mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
-			    mirs.io4.val_odo = 0;
-			    if (mirs.io1.val_dout1) {//бибика поехала <- разблокирован бензонасос
-				mirs.io1.val_din1 = mirs.io1.val_ignition = 1;
-				bit16 = ntohs(mirs.io2.val_ain1);
-				if (bit16 > (min_fuel_tank - max_fuel_tank) >> 1) {//надо заправиться
-				    bit16 -= (min_fuel_tank - max_fuel_tank) >> 1;
-				    if (bit16 < max_fuel_tank) bit16 = max_fuel_tank;
-				    mirs.io2.val_ain1 = htons(bit16);
-				} else {//если больше половины бака -> можно ехать
-				    mirs.io1.val_din4 = 0;//skp - не парковка
-				    send_period = 2;
-				    scena_kols = 255;
-				    bit16 = 1536; mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
-				    //bit16 = max_fuel_tank; mirs.io2.val_ain1 = htons(bit16);//AIN1 : 47 - полный бак
-				    prints(__func__, "Бибика поехала....\n", 1);
-				    move_flag = 1;
-				    bit16 = 12950; mirs.io2.val_evolt = htons(bit16);//ExternalVoltage up
-				}
-			    }
-			break;
-			case 1://North
-			case 3://South
-			    if (one.delta < 0) one.delta *= -1;
-			    bit16 = ntohs(mirs.io2.val_ain2) - 28;
-			    mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
-			    bit16 = ntohs(mirs.gsm.speed); bit16 = scena_kols + 8; mirs.gsm.speed = mirs.io2.val_speed = htons(bit16);
-			    fway = ((bit16 * 1000) / 3600) * ((uint32_t)time(NULL) - last_send); way = fway;
-			    mirs.io4.val_odo = htonl(way);
-			    way += ntohl(mirs.io4.val_todo); mirs.io4.val_todo = htonl(way);
-			    bit15 = ntohs(mirs.gsm.altitude);
-			    if (one.dir == NORTH) {
-				bit32 = ntohl(mirs.gsm.latitude); bit32 += one.delta; mirs.gsm.latitude = htonl(bit32);
-				bit16 = 0; bit15--;
-			    } else if (one.dir == SOUTH) {
-				bit32 = ntohl(mirs.gsm.latitude); bit32 -= one.delta; mirs.gsm.latitude = htonl(bit32);
-				bit16 = 180; bit15++;
-			    }
-			    mirs.gsm.angle = htons(bit16);
-			    mirs.gsm.altitude = (short)htons(bit15);
-			    send_period = sp_move;
-			    cdut--; cdut &= 3;
-			    if (!cdut) {
-				bit16 = ntohs(mirs.io2.val_ain1) + 1;
-				mirs.io2.val_ain1 = htons(bit16);//AIN1 - ДУТ
-				if (bit16 >= (min_fuel_tank - min_fuel_tank/10) ) stop_flag = 1;//если в баке <= 10% -> stop
-			    }
-			    move_flag = 1;
-			break;
-			case 2://East
-			case 4://West
-			    if (one.delta < 0) one.delta *= -1;
-			    bit16 = ntohs(mirs.io2.val_ain2) + 56;
-			    mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
-			    bit16 = ntohs(mirs.gsm.speed); bit16 = scena_kols + 5; mirs.gsm.speed = mirs.io2.val_speed = htons(bit16);
-			    fway = ((bit16 * 1000) / 3600) * ((uint32_t)time(NULL) - last_send); way = fway;
-			    mirs.io4.val_odo = htonl(way);//odometer
-			    way += ntohl(mirs.io4.val_todo); mirs.io4.val_todo = htonl(way);//total odometer
-			    bit15 = ntohs(mirs.gsm.altitude);
-			    if (one.dir == WEST) {
-				bit32 = ntohl(mirs.gsm.longitude); bit32 -= one.delta; mirs.gsm.longitude = htonl(bit32);
-				bit16 = 270; bit15--;
-			    } else if (one.dir == EAST) {
-				bit32 = ntohl(mirs.gsm.longitude); bit32 += one.delta; mirs.gsm.longitude = htonl(bit32);
-				bit16 = 90; bit15++;
-			    }
-			    mirs.gsm.angle = htons(bit16);
-			    mirs.gsm.altitude = (short)htons(bit15);
-			    send_period = sp_move;
-			    cdut--; cdut &= 3;
-			    if (!cdut) {
-				bit16 = ntohs(mirs.io2.val_ain1) + 1;
-				mirs.io2.val_ain1 = htons(bit16);//AIN1 - ДУТ
-				if (bit16 >= (min_fuel_tank - min_fuel_tank/10) ) stop_flag = 1;//если в баке <= 10% -> stop
-			    }
-			    move_flag = 1;
-			break;
-			case 5://"North-East"// - 45 degrees
-			case 6://"North-West"// - 315 degrees
-			case 7://"South-East"// - 135 degrees
-			case 8://"South-West"// - 225 degrees
-			    if (one.delta < 0) one.delta *= -1;
-			    if ((one.dir == NORTH_WEST) || (one.dir == NORTH_EAST)) {
-				bit32 = ntohl(mirs.gsm.latitude); bit32 += one.delta; mirs.gsm.latitude = htonl(bit32);
-				bit16 = ntohs(mirs.io2.val_ain2) - 18;
-			    } else if ((one.dir == SOUTH_WEST) || (one.dir == SOUTH_EAST)) {
-				bit32 = ntohl(mirs.gsm.latitude); bit32 -= one.delta; mirs.gsm.latitude = htonl(bit32);
-				bit16 = ntohs(mirs.io2.val_ain2) - 32;
-			    }
-			    mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
-			    bit16 = ntohs(mirs.gsm.speed); bit16 = scena_kols + 8; mirs.gsm.speed = mirs.io2.val_speed = htons(bit16);
-			    fway = ((bit16 * 1000) / 3600) * ((uint32_t)time(NULL) - last_send); way = fway;
-			    mirs.io4.val_odo = htonl(way);
-			    way += ntohl(mirs.io4.val_todo); mirs.io4.val_todo = htonl(way);
-			    bit15 = ntohs(mirs.gsm.altitude);
-			    bit32 = ntohl(mirs.gsm.longitude);
-			         if (one.dir  == NORTH_WEST) bit16 = 315;
-			    else if (one.dir  == SOUTH_WEST) bit16 = 225;
-			    else if (one.dir  == NORTH_EAST) bit16 =  45;
-			    else if  (one.dir == SOUTH_EAST) bit16 = 135;
-			    if ((one.dir == NORTH_WEST) || (one.dir == SOUTH_WEST))  {
-				bit32 -= one.delta;
-				bit15--;
-			    } else if ((one.dir == NORTH_EAST) || (one.dir == SOUTH_EAST)) {
-				bit32 += one.delta;
-				bit15++;
-			    }
-			    mirs.gsm.longitude = htonl(bit32);
-			    mirs.gsm.angle = htons(bit16);
-			    mirs.gsm.altitude = (short)htons(bit15);
-			    send_period = sp_move;
-			    cdut--; cdut &= 3;
-			    if (!cdut) {
-				bit16 = ntohs(mirs.io2.val_ain1) + 1;
-				mirs.io2.val_ain1 = htons(bit16);//AIN1 - ДУТ
-				if (bit16 >= (min_fuel_tank - min_fuel_tank/10) ) stop_flag = 1;//если в баке <= 10% -> stop
-			    }
-			    move_flag = 1;
-			break;
-			case 9://Stop:10
-			    move_flag = 0;
-			    if (scena_kols == 1) {
-				mirs.io1.val_din1 = mirs.io1.val_ignition = 0;
-				mirs.io1.val_din2 = 0;//Door : 0-открыты   1-закрыты
-				mirs.io1.val_din3 = 0;//Trunk : 0-открыт  1-закрыт
-				mirs.io1.val_din4 = 0;//skp : 0-не парковка  1-парковка
-				bit16 = 234; mirs.io2.val_ain3 = htons(bit16);//AIN3 - hood (Капот) : if (val < 1000) hood = 1;//открыт else hood = 0;//закрыт
-			    } else {
-				mirs.io1.val_din2 = 1;//Door : 0-открыты   1-закрыты
-				mirs.io1.val_din3 = 1;//Trunk : 0-открыт  1-закрыт
-				mirs.io1.val_din4 = 1;//skp : 0-не парковка  1-парковка
-				bit16 = 1250; mirs.io2.val_ain3 = htons(bit16);//AIN3 - hood (Капот) : if (val < 1000) hood = 1;//открыт else hood = 0;//закрыт
-			    }
-			    if (scena_kols == 3) scena_kols--;
-			    mirs.gsm.speed = mirs.io2.val_speed = 0;
-			    send_period = sp_park;
-			    bit16 = 21;  mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
-			    bit16 = 12050; mirs.io2.val_evolt = htons(bit16);//ExternalVoltage down
-			    mirs.io4.val_odo = 0;
-			    if (!mirs.io1.val_dout1) scena_kols = 255;
-                        break;
+                scena_kols++;
+                switch ((int)one.dir) {
+                    case 0://Park:10
+                        move_flag = 0;
+                        send_period = sp_park;
+                        //mirs.gsm.angle = 0;
+                        mirs.gsm.speed = mirs.io2.val_speed = 0;
+                        scena_kols = 1;
+                        mirs.io1.val_din2 = 1;//двери закрыты
+                        mirs.io1.val_din3 = 1;//DIN3 - Trunk : 0-откр.  1-закр.
+                        mirs.io1.val_din4 = 1;//skp - парковка
+                        bit16 = 1200; mirs.io2.val_ain3 = htons(bit16);//AIN3 - hood (Капот) : if (val < 1000) hood = 1;//открыт else hood = 0;//закрыт
+                        bit16 = 326;  mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
+                        mirs.io4.val_odo = 0;
+                        if (mirs.io1.val_dout1) {//бибика поехала <- разблокирован бензонасос
+                            mirs.io1.val_din1 = mirs.io1.val_ignition = 1;
+                            bit16 = ntohs(mirs.io2.val_ain1);
+                            if (bit16 > (min_fuel_tank - max_fuel_tank) >> 1) {//надо заправиться
+                                bit16 -= (min_fuel_tank - max_fuel_tank) >> 1;
+                                if (bit16 < max_fuel_tank) bit16 = max_fuel_tank;
+                                mirs.io2.val_ain1 = htons(bit16);
+                            } else {//если больше половины бака -> можно ехать
+                                mirs.io1.val_din4 = 0;//skp - не парковка
+                                send_period = 2;
+                                scena_kols = 255;
+                                bit16 = 1536; mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
+                                //bit16 = max_fuel_tank; mirs.io2.val_ain1 = htons(bit16);//AIN1 : 47 - полный бак
+                                prints(__func__, "Бибика поехала....\n", 1);
+                                move_flag = 1;
+                                bit16 = 12950; mirs.io2.val_evolt = htons(bit16);//ExternalVoltage up
+                            }
+                        }
+                    break;
+                    case 1://North
+                    case 3://South
+                        if (one.delta < 0) one.delta *= -1;
+                        bit16 = ntohs(mirs.io2.val_ain2) - 28;
+                        mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
+                        bit16 = ntohs(mirs.gsm.speed); bit16 = scena_kols + 8; mirs.gsm.speed = mirs.io2.val_speed = htons(bit16);
+                        fway = ((bit16 * 1000) / 3600) * ((uint32_t)time(NULL) - last_send); way = fway;
+                        mirs.io4.val_odo = htonl(way);
+                        way += ntohl(mirs.io4.val_todo); mirs.io4.val_todo = htonl(way);
+                        bit15 = ntohs(mirs.gsm.altitude);
+                        if (one.dir == NORTH) {
+                            bit32 = ntohl(mirs.gsm.latitude); bit32 += one.delta; mirs.gsm.latitude = htonl(bit32);
+                            bit16 = 0; bit15--;
+                        } else if (one.dir == SOUTH) {
+                            bit32 = ntohl(mirs.gsm.latitude); bit32 -= one.delta; mirs.gsm.latitude = htonl(bit32);
+                            bit16 = 180; bit15++;
+                        }
+                        mirs.gsm.angle = htons(bit16);
+                        mirs.gsm.altitude = (short)htons(bit15);
+                        send_period = sp_move;
+                        cdut--; cdut &= 3;
+                        if (!cdut) {
+                            bit16 = ntohs(mirs.io2.val_ain1) + 1;
+                            mirs.io2.val_ain1 = htons(bit16);//AIN1 - ДУТ
+                            if (bit16 >= (min_fuel_tank - min_fuel_tank/10) ) stop_flag = 1;//если в баке <= 10% -> stop
+                        }
+                        move_flag = 1;
+                    break;
+                    case 2://East
+                    case 4://West
+                        if (one.delta < 0) one.delta *= -1;
+                        bit16 = ntohs(mirs.io2.val_ain2) + 56;
+                        mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
+                        bit16 = ntohs(mirs.gsm.speed); bit16 = scena_kols + 5; mirs.gsm.speed = mirs.io2.val_speed = htons(bit16);
+                        fway = ((bit16 * 1000) / 3600) * ((uint32_t)time(NULL) - last_send); way = fway;
+                        mirs.io4.val_odo = htonl(way);//odometer
+                        way += ntohl(mirs.io4.val_todo); mirs.io4.val_todo = htonl(way);//total odometer
+                        bit15 = ntohs(mirs.gsm.altitude);
+                        if (one.dir == WEST) {
+                            bit32 = ntohl(mirs.gsm.longitude); bit32 -= one.delta; mirs.gsm.longitude = htonl(bit32);
+                            bit16 = 270; bit15--;
+                        } else if (one.dir == EAST) {
+                            bit32 = ntohl(mirs.gsm.longitude); bit32 += one.delta; mirs.gsm.longitude = htonl(bit32);
+                            bit16 = 90; bit15++;
+                        }
+                        mirs.gsm.angle = htons(bit16);
+                        mirs.gsm.altitude = (short)htons(bit15);
+                        send_period = sp_move;
+                        cdut--; cdut &= 3;
+                        if (!cdut) {
+                            bit16 = ntohs(mirs.io2.val_ain1) + 1;
+                            mirs.io2.val_ain1 = htons(bit16);//AIN1 - ДУТ
+                            if (bit16 >= (min_fuel_tank - min_fuel_tank/10) ) stop_flag = 1;//если в баке <= 10% -> stop
+                        }
+                        move_flag = 1;
+                    break;
+                    case 5://"North-East"// - 45 degrees
+                    case 6://"North-West"// - 315 degrees
+                    case 7://"South-East"// - 135 degrees
+                    case 8://"South-West"// - 225 degrees
+                        if (one.delta < 0) one.delta *= -1;
+                            if ((one.dir == NORTH_WEST) || (one.dir == NORTH_EAST)) {
+                            bit32 = ntohl(mirs.gsm.latitude); bit32 += one.delta; mirs.gsm.latitude = htonl(bit32);
+                            bit16 = ntohs(mirs.io2.val_ain2) - 18;
+                        } else if ((one.dir == SOUTH_WEST) || (one.dir == SOUTH_EAST)) {
+                            bit32 = ntohl(mirs.gsm.latitude); bit32 -= one.delta; mirs.gsm.latitude = htonl(bit32);
+                            bit16 = ntohs(mirs.io2.val_ain2) - 32;
+                        }
+                        mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
+                        bit16 = ntohs(mirs.gsm.speed); bit16 = scena_kols + 8; mirs.gsm.speed = mirs.io2.val_speed = htons(bit16);
+                        fway = ((bit16 * 1000) / 3600) * ((uint32_t)time(NULL) - last_send); way = fway;
+                        mirs.io4.val_odo = htonl(way);
+                        way += ntohl(mirs.io4.val_todo); mirs.io4.val_todo = htonl(way);
+                        bit15 = ntohs(mirs.gsm.altitude);
+                        bit32 = ntohl(mirs.gsm.longitude);
+                             if (one.dir  == NORTH_WEST) bit16 = 315;
+                        else if (one.dir  == SOUTH_WEST) bit16 = 225;
+                        else if (one.dir  == NORTH_EAST) bit16 =  45;
+                        else if  (one.dir == SOUTH_EAST) bit16 = 135;
+                        if ((one.dir == NORTH_WEST) || (one.dir == SOUTH_WEST))  {
+                            bit32 -= one.delta;
+                            bit15--;
+                        } else if ((one.dir == NORTH_EAST) || (one.dir == SOUTH_EAST)) {
+                            bit32 += one.delta;
+                            bit15++;
+                        }
+                        mirs.gsm.longitude = htonl(bit32);
+                        mirs.gsm.angle = htons(bit16);
+                        mirs.gsm.altitude = (short)htons(bit15);
+                        send_period = sp_move;
+                        cdut--; cdut &= 3;
+                        if (!cdut) {
+                            bit16 = ntohs(mirs.io2.val_ain1) + 1;
+                            mirs.io2.val_ain1 = htons(bit16);//AIN1 - ДУТ
+                            if (bit16 >= (min_fuel_tank - min_fuel_tank/10) ) stop_flag = 1;//если в баке <= 10% -> stop
+                        }
+                        move_flag = 1;
+                    break;
+                    case 9://Stop:10
+                        move_flag = 0;
+                        if (scena_kols == 1) {
+                            mirs.io1.val_din1 = mirs.io1.val_ignition = 0;
+                            mirs.io1.val_din2 = 0;//Door : 0-открыты   1-закрыты
+                            mirs.io1.val_din3 = 0;//Trunk : 0-открыт  1-закрыт
+                            mirs.io1.val_din4 = 0;//skp : 0-не парковка  1-парковка
+                            bit16 = 234; mirs.io2.val_ain3 = htons(bit16);//AIN3 - hood (Капот) : if (val < 1000) hood = 1;//открыт else hood = 0;//закрыт
+                        } else {
+                            mirs.io1.val_din2 = 1;//Door : 0-открыты   1-закрыты
+                            mirs.io1.val_din3 = 1;//Trunk : 0-открыт  1-закрыт
+                            mirs.io1.val_din4 = 1;//skp : 0-не парковка  1-парковка
+                            bit16 = 1250; mirs.io2.val_ain3 = htons(bit16);//AIN3 - hood (Капот) : if (val < 1000) hood = 1;//открыт else hood = 0;//закрыт
+                        }
+                        if (scena_kols == 3) scena_kols--;
+                        mirs.gsm.speed = mirs.io2.val_speed = 0;
+                        send_period = sp_park;
+                        bit16 = 21;  mirs.io2.val_ain2 = htons(bit16);//AIN2 - Тахометр : if (val > 1000) tah = 1;//двигатель заведен  else tah = 0;//двигатель заглушен
+                        bit16 = 12050; mirs.io2.val_evolt = htons(bit16);//ExternalVoltage down
+                        mirs.io4.val_odo = 0;
+                        if (!mirs.io1.val_dout1) scena_kols = 255;
+                    break;
                 }
                 sprintf(chap, "[%d] msg #%d from %d\n", scena_index, scena_kols, one.kols);
                 prints(__func__, chap, 1);
                 if (scena_kols >= one.kols) {
                     scena_kols = 0;
                     scena_index++;
-                   if (scena_index > scena_total) scena_index = 1;
-                   send_period = sp_move;
+                    if (scena_index > scena_total) scena_index = 1;
+                    send_period = sp_move;
                 }
 
             }
@@ -803,7 +810,10 @@ int parse_cmd(uint8_t ct,   // command_type
               int *ci)      // index of command
 {
 int len, i, j, k, ret = -1, ind = -1, bit, tim;
-char ack_body[256] = {0}, param[256] = {0}, tmp[32], chap[128] = {0};
+char ack_body[256] = {0};
+char param[256] = {0};
+char tmp[32];
+char chap[128] = {0};
 char *uk = NULL, *uks = NULL, *uke = NULL, *us = NULL;
 uint8_t *uki = out;
 uint8_t cid = 12; // codec.id
@@ -833,28 +843,26 @@ s_mir mirs;
             break;
         }
     }
-    if (ind == -1) sprintf(ack_body,"%s", err);
-              else sprintf(ack_body,"%s", acks[ind]);
+    if (ind == -1) sprintf(ack_body, "%s", err);
+              else sprintf(ack_body, "%s", acks[ind]);
 
     switch (ind) {
         case 0://getgps
         {
             //GPS:1 Sat:5 Lat:54.694922 Long:20.516853 Alt:-353 Speed:0 Dir:104 Date: 2018/7/24 Time: 6:44:47
-            int i_hour, i_min, i_sec, i_year, i_day, i_mes;
             time_t tct = time(NULL);
             struct tm *ct = localtime(&tct);
-            i_hour = ct->tm_hour;        i_min = ct->tm_min;  i_sec = ct->tm_sec;
-            i_year = ct->tm_year + 1900; i_day = ct->tm_mday; i_mes = ct->tm_mon + 1;
-            if (mirs.gsm.sattelites) sprintf(ack_body,"GPS:1");
-                                else sprintf(ack_body,"GPS:0");
-            sprintf(ack_body+strlen(ack_body)," Sat:%u Lat:%.6f Long:%.6f Alt:%d Speed:%u Dir:%u Date: %04d/%02d/%02d Time: %02d:%02d:%02d",
+            if (mirs.gsm.sattelites) sprintf(ack_body, "GPS:1");
+                                else sprintf(ack_body, "GPS:0");
+            sprintf(ack_body+strlen(ack_body), " Sat:%u Lat:%.6f Long:%.6f Alt:%d Speed:%u Dir:%u Date: %04d/%02d/%02d Time: %02d:%02d:%02d",
                         mirs.gsm.sattelites,
                         (float)(ntohl(mirs.gsm.latitude)) / 10000000,
                         (float)(ntohl(mirs.gsm.longitude)) / 10000000,
                         (short)ntohs(mirs.gsm.altitude),
                         ntohs(mirs.gsm.speed),
                         ntohs(mirs.gsm.angle),
-                        i_year, i_mes, i_day, i_hour, i_min, i_sec);
+                        ct->tm_year + 1900, ct->tm_mon + 1, ct->tm_mday,
+                        ct->tm_hour, ct->tm_min, ct->tm_sec);
         }
         break;
         case 2://getver
@@ -865,7 +873,7 @@ s_mir mirs;
             }
         break;
         case 3://getio
-            sprintf(ack_body,"DI1:%u DI2:%u DI3:%u DI4:%u AIN1:%u AIN2:%u AIN3:%u DO1:%u DO2:%u DO3:%u DO4:%u",
+            sprintf(ack_body, "DI1:%u DI2:%u DI3:%u DI4:%u AIN1:%u AIN2:%u AIN3:%u DO1:%u DO2:%u DO3:%u DO4:%u",
                         mirs.io1.val_din1, mirs.io1.val_din2, mirs.io1.val_din3, mirs.io1.val_din3,
                         ntohs(mirs.io2.val_ain1), ntohs(mirs.io2.val_ain2), ntohs(mirs.io2.val_ain3),
                         mirs.io1.val_dout1, mirs.io1.val_dout2, mirs.io1.val_dout3, mirs.io1.val_dout4);
@@ -981,7 +989,7 @@ s_mir mirs;
             if (erc) sprintf(ack_body, "%s : %s", com, err);
             else {//command parse OK | "DOUTS are set to: 1XXX TMOs are: 0 0 0 0",//6 = cmd1 - enable gasoline pump
                 sprintf(ack_body, "DOUTS are set to: ");
-                sprintf(param," TMOs are:");
+                sprintf(param, " TMOs are:");
                 for (k = 0; k < max_pin; k++) {
                     switch (k) {
                         case 0: mirs.io1.val_dout1 = pn[k].stat; break;
@@ -993,10 +1001,10 @@ s_mir mirs;
                         if (pn[k].time > 0) tmr_pin[k] = get_timer_sec(pn[k].time);
                                        else tmr_pin[k] = 0;
                     } else tmr_pin[k] = 0;//set pin to 0
-                    sprintf(ack_body+strlen(ack_body),"%u", pn[k].stat);
-                    sprintf(param+strlen(param)," %d", pn[k].time);
+                    sprintf(ack_body+strlen(ack_body), "%u", pn[k].stat);
+                    sprintf(param+strlen(param), " %d", pn[k].time);
                 }//for
-                sprintf(ack_body+strlen(ack_body),"%s",param);
+                sprintf(ack_body+strlen(ack_body), "%s",param);
                 memcpy((uint8_t *)&pin[0].stat, (uint8_t *)&pn[0].stat, sizeof(s_box) * max_pin);
             }
         break;
@@ -1045,7 +1053,8 @@ s_mir mirs;
                 }
                 sprintf(ack_body, "%s : OK\r\n", com);
                 memcpy((uint8_t *)&box[0].stat, (uint8_t *)&bx[0].stat, sizeof(s_box) * max_relay);
-                sprintf(chap,"cmd=%d (%s) : rel=%d bit=%d tim=%u\n", ind, cmds[ind], k, bit, tim); prints(__func__, chap, 1);
+                sprintf(chap, "cmd=%d (%s) : rel=%d bit=%d tim=%u\n", ind, cmds[ind], k, bit, tim);
+                prints(__func__, chap, 1);
             }
         break;
     }
@@ -1094,8 +1103,8 @@ s_mir mirs;
     if (cid == 13) ret += 4;
 
     char stx[256] = {0};
-    if (cid == 13) sprintf(stx,"ret=%d len_ks=%u timestamp=%u ack:%s\n", ret, len, (uint32_t)ntohl(ts4), ack_body);
-              else sprintf(stx,"ret=%d len_ks=%u ack:%s\n", ret, len, ack_body);
+    if (cid == 13) sprintf(stx, "ret=%d len_ks=%u timestamp=%u ack:%s\n", ret, len, (uint32_t)ntohl(ts4), ack_body);
+              else sprintf(stx, "ret=%d len_ks=%u ack:%s\n", ret, len, ack_body);
     prints(__func__, stx, 1);
 
     *ci = ind;//return command index to upper level
@@ -1106,7 +1115,7 @@ s_mir mirs;
 int add_ones(s_ones *data, uint8_t flag)
 {
 s_rec *tmp = NULL, *rec = NULL, *next = NULL;
-int ret = -1, yes = 0, dl = 0;
+int ret = -1, yes = 0;
 char stx[max_url_len] = {0};
 
     if (!data) return ret;
@@ -1136,15 +1145,16 @@ char stx[max_url_len] = {0};
                 hdr_rec.counter++;
                 rec->index = hdr_rec.counter;
                 ret = hdr_rec.counter;
-                if (flag)
-                    dl = sprintf(stx,"Add record [%u] '%s'(%d):%d:%d\n",
-                                     ret, scena[(int)rec->ones.dir], (int)rec->ones.dir, rec->ones.delta, rec->ones.kols);
+                if (flag) {
+                    sprintf(stx, "Add record [%u] '%s'(%d):%d:%d\n",
+                                 ret, scena[(int)rec->ones.dir], (int)rec->ones.dir, rec->ones.delta, rec->ones.kols);
+                }
             }
         }
 
     pthread_mutex_unlock(&rec_mutex);//unlock list
 
-    if (flag && dl) prints(__func__, stx, 1);
+    if (flag && yes) prints(__func__, stx, 1);
 
     return ret;
 }
@@ -1161,8 +1171,8 @@ int dl = 0;
             rec = hdr_rec.first;
             while (rec) {
                 if (rec->index == ind) {
-                    if (flag) dl = sprintf(stx,"Get record [%u] '%s'(%d):%d:%d\n",
-                                               rec->index, scena[(int)rec->ones.dir], (int)rec->ones.dir, rec->ones.delta, rec->ones.kols);
+                    if (flag) dl = sprintf(stx, "Get record [%u] '%s'(%d):%d:%d\n",
+                                                rec->index, scena[(int)rec->ones.dir], (int)rec->ones.dir, rec->ones.delta, rec->ones.kols);
                     if (data) memcpy((uint8_t *)&data->dir, (uint8_t *)&rec->ones.dir, sizeof(s_ones));
                     break;
                 } else {
@@ -1193,13 +1203,13 @@ int ret = 0;
             while (rec) {
                 if (rec->ones.dir == rumb) {
                     ret = rec->index;
-                    if (flag) dl = sprintf(stx,"Find_ind_by_dir %d : %d:'%s'(%d):%d:%d\n",
-                                               (int)rumb,
-                                               ret,
-                                               scena[(int)rec->ones.dir],
-                                               (int)rec->ones.dir,
-                                               rec->ones.delta,
-                                               rec->ones.kols);
+                    if (flag) dl = sprintf(stx, "Find_ind_by_dir %d : %d:'%s'(%d):%d:%d\n",
+                                                (int)rumb,
+                                                ret,
+                                                scena[(int)rec->ones.dir],
+                                                (int)rec->ones.dir,
+                                                rec->ones.delta,
+                                                rec->ones.kols);
                     break;
                 } else {
                     next = rec->next;
@@ -1222,7 +1232,7 @@ char stx[max_url_len] = {0};
 
     pthread_mutex_lock(&rec_mutex);
 
-        if (flag) sprintf(stx,"Delete %u records from list\n", hdr_rec.counter);
+        if (flag) sprintf(stx, "Delete %u records from list\n", hdr_rec.counter);
 
         rec = hdr_rec.first;
 
@@ -1250,13 +1260,13 @@ char stx[len1k] = {0};
 
     pthread_mutex_lock(&rec_mutex);
 
-        if (flag) sprintf(stx,"Total records in list %u :\n", hdr_rec.counter);
+        if (flag) sprintf(stx, "Total records in list %u :\n", hdr_rec.counter);
 
         rec = hdr_rec.first;
 
         while (rec) {
-            if (flag) sprintf(stx+strlen(stx),"\t[%u] '%s'(%d):%d:%d\n",
-                                              rec->index, scena[(int)rec->ones.dir], (int)rec->ones.dir, rec->ones.delta, rec->ones.kols);
+            if (flag) sprintf(stx+strlen(stx), "\t[%u] '%s'(%d):%d:%d\n",
+                                               rec->index, scena[(int)rec->ones.dir], (int)rec->ones.dir, rec->ones.delta, rec->ones.kols);
             next = rec->next;
             if (next) rec = next;
                  else rec = NULL;

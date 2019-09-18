@@ -9,7 +9,8 @@ static uint8_t from_server[buf_size];
 char scmd[256];
 char tmp[buf_size << 1];
 char chap[2048] = {0};
-char stx[256] = {0}, line[256] = {0};
+char stx[256] = {0};
+char line[256] = {0};
 uint16_t tcp_port;
 struct sockaddr_in srv_conn;
 socklen_t srvlen;
@@ -30,7 +31,7 @@ s_conf cfg;
 uint64_t bit64;
 
 time_t start_ses = time(NULL);
-time_t stop_ses = time(NULL);
+time_t stop_ses  = time(NULL);
 char pid_name[128] = {0};
 
 uint32_t *first_lat = NULL, *first_lon = NULL;
@@ -53,7 +54,7 @@ float flat = 0.0, flon = 0.0;
         pid_name[ik] = '\0';
     }
     uks = strstr(pid_name, ".conf"); if (uks) *uks = '\0';
-    sprintf(fm_log,"%s%s", pid_name, fm_log_tail);
+    sprintf(fm_log, "%s%s", pid_name, fm_log_tail);
     sprintf(pid_name+strlen(pid_name), ".pid");
 
     fd_log = open(fm_log, O_WRONLY | O_APPEND | O_CREAT, 0664);
@@ -90,6 +91,7 @@ float flat = 0.0, flon = 0.0;
     pthread_mutex_lock(&conf_mutex);
             memcpy((char *)&cfg, (char *)&conf, sizeof(s_conf));
     pthread_mutex_unlock(&conf_mutex);
+
     memset(line, 0, sizeof(line));
     strcpy(line, (char *)cfg.srv);
     tcp_port = cfg.port;
@@ -99,7 +101,7 @@ float flat = 0.0, flon = 0.0;
     if (cfg.snd_move) sp_move = cfg.snd_move;
     if (cfg.wait_ack) wait_ack_sec = cfg.wait_ack;
     if (cfg.wait_before_new_connect) wait_before_new_connect = cfg.wait_before_new_connect;
-    if (cfg.latitude) { first_lat = &cfg.latitude; flat = cfg.latitude; flat /= 10000000; }
+    if (cfg.latitude)  { first_lat = &cfg.latitude;  flat = cfg.latitude;  flat /= 10000000; }
     if (cfg.longitude) { first_lon = &cfg.longitude; flon = cfg.longitude; flon /= 10000000; }
 
 
@@ -121,13 +123,17 @@ float flat = 0.0, flon = 0.0;
         fclose(pid_fp);
     }
 
-    sprintf(chap,"[%s] MAIN START :\n\tserver=%s:%d\n\timei=%s\n\tmode=%u\n\tsend_period=%d/%d\n\twait_ack=%d\n\twait_before_new_connect=%d\n\tlocation=%f,%f\n",
-                 Version, line, tcp_port, im, work_mode, sp_park, sp_move, wait_ack_sec, wait_before_new_connect, flat, flon);
+    sprintf(chap, "[%s] MAIN START :\n\tserver=%s:%d\n\timei=%s\n"
+                  "\tmode=%u\n\tsend_period=%d/%d\n\twait_ack=%d\n"
+                  "\twait_before_new_connect=%d\n\tlocation=%f,%f\n",
+                  Version, line, tcp_port, im,
+                  work_mode, sp_park, sp_move, wait_ack_sec,
+                  wait_before_new_connect, flat, flon);
     if (work_mode) {
         pthread_mutex_lock(&rec_mutex);
             scena_total = hdr_rec.counter;
         pthread_mutex_unlock(&rec_mutex);
-        sprintf(chap+strlen(chap),"\ttotal_scena=%u\n", scena_total);
+        sprintf(chap+strlen(chap), "\ttotal_scena=%u\n", scena_total);
     }
     prints(NULL, chap, 1);
 
@@ -148,7 +154,7 @@ float flat = 0.0, flon = 0.0;
         if (!hostPtr) {
             hostPtr = gethostbyaddr(line, strlen(line), AF_INET);
             if (!hostPtr) {
-                sprintf(chap,"ERROR resolving server address '%s'\n", line);
+                sprintf(chap, "ERROR resolving server address '%s'\n", line);
                 prints(__func__, chap, 1);
                 goto out_of_job;
             }
@@ -157,9 +163,9 @@ float flat = 0.0, flon = 0.0;
         start_ses = time(NULL);
 
         srvlen = sizeof(struct sockaddr);
-        memset(&srv_conn,0,srvlen);
+        memset(&srv_conn, 0, srvlen);
         srv_conn.sin_family = AF_INET;
-        srv_conn.sin_port = htons(tcp_port);
+        srv_conn.sin_port   = htons(tcp_port);
         (void) memcpy(&srv_conn.sin_addr, hostPtr->h_addr, hostPtr->h_length);
 
 
@@ -204,12 +210,12 @@ float flat = 0.0, flon = 0.0;
                 case 0 :
                     if (first) {
                         first = 0;
-                        memset(to_server, 0, buf_size);
+                        memset(to_server, 0, sizeof(to_server));
                         bit64 = sizeof(s_imei);
                         memcpy(to_server, (uint8_t *)&avl_imei.len, bit64);
-                        sprintf(chap,"data to server (%"PRIu64"):", bit64);
-                        for (i = 0; i < sizeof(s_imei); i++) sprintf(chap+strlen(chap), "%02X ",(uint8_t)to_server[i]);
-                        sprintf(chap+strlen(chap), "\n");
+                        sprintf(chap, "data to server (%"PRIu64"):", bit64);
+                        for (i = 0; i < sizeof(s_imei); i++) sprintf(chap+strlen(chap), "%02X ", (uint8_t)to_server[i]);
+                        strcat(chap, "\n");
                         prints(__func__, chap, 1);
                         resa = send(connsocket, to_server, sizeof(s_imei), MSG_DONTWAIT);
                         tmr_ack = get_timer_sec(wait_ack_sec);
@@ -228,11 +234,11 @@ float flat = 0.0, flon = 0.0;
                             rdy = 0;
                             sprintf(chap, "data from server (%d):", lenr);
                             if (lenr > 0) {
-                                for (i = 0; i < lenr; i++) sprintf(chap+strlen(chap), "%02X ",(uint8_t)from_server[i]);
+                                for (i = 0; i < lenr; i++) sprintf(chap+strlen(chap), "%02X ", (uint8_t)from_server[i]);
                             }
-                            sprintf(chap+strlen(chap), "\n");
+                            strcat(chap, "\n");
                             prints(__func__, chap, 1);
-                            memset(from_server, 0, buf_size); lenr = 0;
+                            memset(from_server, 0, sizeof(from_server)); lenr = 0;
                             break;
                         }
                     }
@@ -247,8 +253,8 @@ float flat = 0.0, flon = 0.0;
                         body_len = 0;
                         lenr_wait = 4;
                         lenr = lenr_tmp = 0; ind = 0;
-                        memset(to_server, 0, buf_size);
-                        memset(from_server, 0, buf_size);
+                        memset(to_server, 0, sizeof(to_server));
+                        memset(from_server, 0, sizeof(from_server));
                         last_send = (uint32_t)time(NULL);
                         stop_flag = 0;
                         wait_ack = 0;
@@ -266,9 +272,10 @@ float flat = 0.0, flon = 0.0;
                             if (lens > 0) {
                                 resa = send(connsocket, to_server, lens, MSG_DONTWAIT);
                                 cnt_send++;
-                                sprintf(tmp,"Send packet #%u with len=%d to server:\n", cnt_send, lens);
-                                for (i = 0; i < lens; i++) sprintf(tmp+strlen(tmp),"%02X",(uint8_t)to_server[i]);
-                                sprintf(tmp+strlen(tmp),"\n"); prints(__func__, tmp, 1);
+                                sprintf(tmp, "Send packet #%u with len=%d to server:\n", cnt_send, lens);
+                                for (i = 0; i < lens; i++) sprintf(tmp+strlen(tmp), "%02X", (uint8_t)to_server[i]);
+                                strcat(tmp, "\n");
+                                prints(__func__, tmp, 1);
                                 if (resa != lens) { Vixod = 1; err |= 20;/* write error */ break; }
                                 else {//goto recv. ack from server
                                     wait_ack = 1; lenr = lenr_tmp = 0; ind = 0; lenr_wait = 4;
@@ -286,7 +293,8 @@ float flat = 0.0, flon = 0.0;
                             lenr_tmp = recv(connsocket, &from_server[ind], 1, MSG_DONTWAIT);
                             if (lenr_tmp == 0) { err |= 2; Vixod = 1; break; }
                             else if (lenr_tmp > 0) {
-                                lenr += lenr_tmp; ind += lenr_tmp;
+                                lenr += lenr_tmp;
+                                ind  += lenr_tmp;
                                 if (lenr == lenr_wait) {//4 or X bytes must be recv. from server
                                     switch (from_server[3]) {
                                         case 0 : //!!!   recv. command from server   !!!
@@ -302,13 +310,13 @@ float flat = 0.0, flon = 0.0;
                                                 ctype = avl_cmd->cmd_type;
                                                 body_uk = (char *)&from_server[sizeof(s_avl_cmd)];
                                                 sprintf(chap, "data from server (%d) :", lenr);
-                                                for (i = 0; i < lenr; i++) sprintf(chap+strlen(chap), "%02X",(uint8_t)from_server[i]);
+                                                for (i = 0; i < lenr; i++) sprintf(chap+strlen(chap), "%02X", (uint8_t)from_server[i]);
                                                 if (body_len > 0) {
                                                     memcpy(scmd, body_uk, body_len&0xff);
                                                     uk = strstr(scmd, "\r\n"); if (uk) *uk = '\0';
                                                     sprintf(chap+strlen(chap), "\n\tcmd='%s'", scmd);
                                                 }
-                                                sprintf(chap+strlen(chap), "\n");
+                                                strcat(chap, "\n");
                                                 prints(__func__, chap, 1);
                                                 // ----------   clear all   --------------
                                                 memset(from_server, 0, buf_size);
@@ -319,9 +327,9 @@ float flat = 0.0, flon = 0.0;
                                                 icmd = parse_cmd(ctype, scmd, to_server, &com_id);
                                                 if (icmd > 0) {
                                                     resa = send(connsocket, to_server, icmd, MSG_DONTWAIT);//send to server ack for command
-                                                    sprintf(tmp,"Send ack for cmd(%d)='%s' :", com_id, scmd);
-                                                    for (i = 0; i < icmd; i++) sprintf(tmp+strlen(tmp),"%02X",(uint8_t)to_server[i]);
-                                                    sprintf(tmp+strlen(tmp),"\n");
+                                                    sprintf(tmp, "Send ack for cmd(%d)='%s' :", com_id, scmd);
+                                                    for (i = 0; i < icmd; i++) sprintf(tmp+strlen(tmp), "%02X", (uint8_t)to_server[i]);
+                                                    strcat(tmp, "\n");
                                                     prints(__func__, tmp, 1);
                                                     if (resa != icmd) { Vixod = 1; err |= 20; break; }// write error
                                                     else
@@ -332,10 +340,11 @@ float flat = 0.0, flon = 0.0;
                                         default : {// byte > 0 | == kol_pack) // =1  server recv. packet OK
                                             wait_ack = 0;
                                             sprintf(chap, "data from server (%d) :", lenr);
-                                            if (lenr > 0) { for (i = 0; i < lenr; i++) sprintf(chap+strlen(chap), "%02X",(uint8_t)from_server[i]); }
-                                            sprintf(chap+strlen(chap), "\n");
+                                            if (lenr > 0) { for (i = 0; i < lenr; i++) sprintf(chap+strlen(chap), "%02X", (uint8_t)from_server[i]); }
+                                            strcat(chap, "\n");
                                             prints(__func__, chap, 1);
-                                            memset(from_server, 0, buf_size); lenr = lenr_tmp = 0; ind = 0; lenr_wait = 4;
+                                            memset(from_server, 0, sizeof(from_server));
+                                            lenr = lenr_tmp = 0; ind = 0; lenr_wait = 4;
                                         }
                                     }//switch (from_server[3])
                                     if (Vixod) break;
@@ -362,7 +371,7 @@ float flat = 0.0, flon = 0.0;
                         sprintf(chap, "MAIN : relay_box %d set to 0 by timer (%u sec.) => relay new status :", j + 1, box[j].time);
                         box[j].time = 0;
                         for (ik = max_relay - 1; ik >= 0; ik--) sprintf(chap+strlen(chap), " %u", box[ik].stat);
-                        sprintf(chap+strlen(chap), "\n");
+                        strcat(chap, "\n");
                         prints(__func__, chap, 1);
                     }
                 }
@@ -385,7 +394,7 @@ float flat = 0.0, flon = 0.0;
                         sprintf(chap, "MAIN : relay_pin %d set to 0 by timer (%u sec.) => pin new status :", j + 1, pin[j].time);
                         pin[j].time = 0;
                         for (ik = max_pin - 1; ik >= 0; ik--) sprintf(chap+strlen(chap), " %u", pin[ik].stat);
-                        sprintf(chap+strlen(chap), "\n");
+                        strcat(chap, "\n");
                         prints(__func__, chap, 1);
                     }
                 }
@@ -396,13 +405,13 @@ float flat = 0.0, flon = 0.0;
         }/*while (!QuitAll && !Vixod)*/
 
         if (err) {
-            sprintf(chap,"Error code 0x%02X :\n", err);
-            if (err&1) sprintf(chap+strlen(chap),"\tSend imei to server error.\n");
-            if (err&2) sprintf(chap+strlen(chap),"\tServer closed connection without answer.\n");
-            if (err&4) sprintf(chap+strlen(chap),"\tServer reject connection (imei unknown).\n");
-            if (err&8) sprintf(chap+strlen(chap),"\tTimeout recv. data from server.\n");
-            if (err&0x10) sprintf(chap+strlen(chap),"\tInternal error.\n");
-            if (err&0x20) sprintf(chap+strlen(chap),"\tSend packet to server error.\n");
+            sprintf(chap, "Error code 0x%02X :\n", err);
+            if (err&1)    sprintf(chap+strlen(chap), "\tSend imei to server error.\n");
+            if (err&2)    sprintf(chap+strlen(chap), "\tServer closed connection without answer.\n");
+            if (err&4)    sprintf(chap+strlen(chap), "\tServer reject connection (imei unknown).\n");
+            if (err&8)    sprintf(chap+strlen(chap), "\tTimeout recv. data from server.\n");
+            if (err&0x10) sprintf(chap+strlen(chap), "\tInternal error.\n");
+            if (err&0x20) sprintf(chap+strlen(chap), "\tSend packet to server error.\n");
             prints(__func__, chap, 1);
         }
 
@@ -430,7 +439,7 @@ stop_job:
 
     del_all_ones(1);
 
-    sprintf(chap,"[%s] MAIN STOP server=%s:%d imei=%s mode=%u\n================================================================\n",
+    sprintf(chap, "[%s] MAIN STOP server=%s:%d imei=%s mode=%u\n================================================================\n",
                  Version, line, tcp_port, im, work_mode);
     prints(NULL, chap, 1);
 
