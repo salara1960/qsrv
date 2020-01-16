@@ -51,7 +51,8 @@
 //char const *vers = "3.8";//27.01.2019 - major changes in QML and CordClass (location changed by QML timer)
 //char const *vers = "3.8.1";//28.01.2019 - minor changes in CordClass and QML (get parent_width and parent_height from C++ to QML)
 //char const *vers = "3.8.2";//18.03.2019 - minor changes
-char const *vers = "3.8.3";//25.03.2019 - minor changes++
+//char const *vers = "3.8.3";//25.03.2019 - minor changes++
+char const *vers = "3.8.4";//16.01.2020 - minor changes+++
 
 
 const QString title = "GPS server application (Teltonika device's)";
@@ -982,7 +983,7 @@ QString qstx, qstz;
 
 
 
-    if ((dline < static_cast<int>(sizeof(s_hdr_pack_bin))) || (dline >= static_cast<int>(buf_size)) || (js == nullptr)) {
+    if ((dline < static_cast<int>(sizeof(s_hdr_pack_bin))) || (dline >= static_cast<int>(buf_size)) || (!js)) {
         qstx.sprintf("Parse AVL error or ack for command -> len=%d\n", dline);
         LogSave(__func__, qstx, 1);
         return -1;
@@ -1859,8 +1860,9 @@ void MainWindow::slotRdyPack(int ilen)
                     PrnTextInfo(dt + qstx);
                     LogSave(nullptr, qstx, 0);
                     codec_id = 0;
-                    if ((latitude < cord.latitude) || (latitude > cord.latitude) || (longitude < cord.longitude) || (longitude > cord.longitude)) {
-                        dt.sprintf("%02d:%02d:%02d  coordinate: %.6f,.6%f - %.6f,%.6f\n",
+                    //if ((latitude < cord.latitude) || (latitude > cord.latitude) || (longitude < cord.longitude) || (longitude > cord.longitude)) {
+                    if ((latitude != cord.latitude) || (longitude != cord.longitude)) {
+                        dt.sprintf("%02d:%02d:%02d  coordinate: %.6f,%.6f - %.6f,%.6f\n",
                                    ct->tm_hour, ct->tm_min, ct->tm_sec,
                                    latitude, longitude,
                                    cord.latitude, cord.longitude);
@@ -1872,7 +1874,7 @@ void MainWindow::slotRdyPack(int ilen)
                         if (Coro) Coro->set_pos(&cord);
                     }
                 }
-            } else LogSave(__func__, "Error codec_id = " + QString::number(codec_id, 10), 1);
+            }// else LogSave(__func__, "Error codec_id = " + QString::number(codec_id, 10), 1);
 
             delete jobj;
         }

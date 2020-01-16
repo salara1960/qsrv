@@ -48,7 +48,7 @@
 
 //********************************************************************************
 
-#define SET_DEBUG
+#undef SET_DEBUG
 
 #define size_imei 15
 #define size_num 16
