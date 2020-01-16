@@ -12,24 +12,29 @@
 
 #include "srv.h"
 
+//map type : "osm","mapboxgl","esri"
 
 int main(int argc, char *argv[])
 {
 int port = 9090, cerr = 0;
 QString errStr = "", cerrStr;
 QString dnm("cars.s3db");
+QString nm("osm");
 
     setlocale(LC_ALL,"UTF8");
 
     if (argc > 1) parse_param_start(argv[1]);
     if (argc > 2) parse_param_start(argv[2]);
+    if (argc > 3) parse_param_start(argv[3]);
+
     if (srv_port > 0) port = srv_port;
     if (sdnm.length() > 0) dnm = sdnm;
+    if (win_map.length() > 0) nm = win_map;
 
     try {
         QApplication srv(argc, argv);
 
-        MainWindow wnd(nullptr, port, &dnm);
+        MainWindow wnd(nullptr, port, &dnm, nm);
 
         wnd.show();
 

@@ -52,7 +52,8 @@
 //char const *vers = "3.8.1";//28.01.2019 - minor changes in CordClass and QML (get parent_width and parent_height from C++ to QML)
 //char const *vers = "3.8.2";//18.03.2019 - minor changes
 //char const *vers = "3.8.3";//25.03.2019 - minor changes++
-char const *vers = "3.8.4";//16.01.2020 - minor changes+++
+//char const *vers = "3.8.4";//16.01.2020 - minor changes+++
+char const *vers = "3.9";//16.01.2020 - minor changes : select map type_name (osm,mapboxgl,esri)
 
 
 const QString title = "GPS server application (Teltonika device's)";
@@ -62,6 +63,7 @@ const int time_wait_answer = 10000;//10 sec.
 
 int srv_port = 0;
 QString sdnm = "";
+QString win_map = "";
 
 char gradus = '^';
 const char *prio_name[] = {"Low", "High", "Panic", "Security"};
@@ -221,6 +223,12 @@ char *uk = nullptr;
         if (uk) {
             uk += 3;
             sdnm.clear(); sdnm.append(uk);
+        } else {
+            uk = strstr(param, "map=");
+            if (uk) {
+                uk += 4;
+                win_map.clear(); win_map.append(uk);
+            }
         }
     }
 }
@@ -1354,7 +1362,7 @@ MainWindow::TheError::TheError(int err) { code = err; }//error class descriptor
 //----------------------------------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------------------------------
-MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(parent), ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget *parent, int p, QString *dnm, QString name_map) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
 
     ui->setupUi(this);
@@ -1364,6 +1372,7 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
 
     this->setWindowOpacity(0.95);//set the level of transparency
 
+    mapName = name_map;
     port = p;
     tcpServer = nullptr;
     query = nullptr;
@@ -1420,7 +1429,7 @@ MainWindow::MainWindow(QWidget *parent, int p, QString *dnm) : QMainWindow(paren
 
     wid = new QQuickWidget(QUrl(QStringLiteral("qrc:/srv.qml")), wids);
     if (wid) {
-        Coro = new CordClass(wid, &cord, wids->geometry());
+        Coro = new CordClass(wid, mapName, &cord, wids->geometry());
         if (Coro) wid->rootContext()->setContextProperty("wini", Coro);
     }
 

@@ -174,6 +174,7 @@ typedef struct
 
 extern int srv_port;
 extern QString sdnm;
+extern QString win_map;
 extern char const *vers;
 extern uint8_t dbg;
 extern char gradus;
@@ -209,7 +210,7 @@ class CordClass : public QObject
 {
     Q_OBJECT
 public:
-    explicit CordClass(QObject *parent = nullptr, s_cord *loc = nullptr, QRect r = {0,0,0,0}) : QObject(parent)
+    explicit CordClass(QObject *parent = nullptr, QString nmap = "osm", s_cord *loc = nullptr, QRect r = {0,0,0,0}) : QObject(parent)
     {
         if (loc) {
             m_lat = loc->latitude;
@@ -219,8 +220,12 @@ public:
             w = r.width();
             h = r.height();
         }
+        nm = nmap;
+
     }
     ~CordClass() {}
+
+    Q_INVOKABLE QString get_name() const { return nm; }
 
     Q_INVOKABLE int get_w() const { return w; }
     Q_INVOKABLE int get_h() const { return h; }
@@ -243,6 +248,7 @@ public:
 private:
     double m_lat = 0.0, m_lon = 0.0;
     int w = 800, h = 260;
+    QString nm;
 };
 
 //********************************************************************************
@@ -265,7 +271,7 @@ public:
             TheError(int);
     };
 
-    explicit MainWindow(QWidget *parent = nullptr, int p = 9090, QString *dnm = nullptr);
+    explicit MainWindow(QWidget *parent = nullptr, int p = 9090, QString *dnm = nullptr, QString name_map = "osm");
     ~MainWindow();
     void timerEvent(QTimerEvent *event);
 
@@ -331,6 +337,8 @@ private:
     s_cord cord;
     CordClass *Coro;
     QObject *RootObj;
+
+    QString mapName;
 
 };
 
